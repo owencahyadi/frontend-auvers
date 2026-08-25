@@ -19,7 +19,7 @@ export default function LoginPage() {
       // 1. KITA HAPUS pemanggilan csrf-cookie karena sudah pakai Token
       
       // 2. Langsung kirim request login ke endpoint backend
-      const response = await api.post('/api/login', { 
+      const response = await api.post('/login', { 
         email, 
         password 
       });
