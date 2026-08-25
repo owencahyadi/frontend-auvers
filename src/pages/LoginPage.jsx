@@ -17,7 +17,7 @@ export default function LoginPage() {
 
     try {
       await api.get('/sanctum/csrf-cookie', {
-        baseURL: 'http://localhost:8000' 
+        baseURL: 'https://backend-auvers.onrender.com' 
       });
 
       const response = await api.post('/login', { email, password });
