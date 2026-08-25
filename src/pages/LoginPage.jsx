@@ -16,10 +16,9 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // 1. Ambil cookie CSRF terlebih dahulu melalui instance Axios
-      await api.get('/sanctum/csrf-cookie');
-
-      // 2. Kirim request login ke endpoint /api/login
+      // 1. KITA HAPUS pemanggilan csrf-cookie karena sudah pakai Token
+      
+      // 2. Langsung kirim request login ke endpoint backend
       const response = await api.post('/api/login', { 
         email, 
         password 
@@ -27,8 +26,10 @@ export default function LoginPage() {
       
       if (response.data.status === 'success') {
         const userData = response.data.user;
+        const token = response.data.token; // Ambil token dari respon backend
 
-        // Simpan data user
+        // 3. Simpan token dan data user ke localStorage
+        localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(userData));
         
         // Simpan store_id otomatis jika yang login adalah manager
@@ -44,8 +45,12 @@ export default function LoginPage() {
       if (err.response?.status === 429) {
         setError('Too many attempts. Please try again later.');
       } else if (err.response?.status === 422) {
+        // Error validasi input dari backend
         const errors = err.response.data.errors;
         setError(errors[Object.keys(errors)[0]][0]);
+      } else if (err.response?.status === 401) {
+        // Error karena email/password salah (Unauthorized)
+        setError('Email atau password salah.');
       } else {
         setError('A server error occurred.');
       }
