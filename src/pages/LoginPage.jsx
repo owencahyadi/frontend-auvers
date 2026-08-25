@@ -20,7 +20,7 @@ export default function LoginPage() {
       await api.get('https://backend-auvers.onrender.com/sanctum/csrf-cookie');
 
       // 2. Kirim request login ke endpoint /login Render
-      const response = await api.post('https://backend-auvers.onrender.com/login', { 
+      const response = await api.post('https://backend-auvers.onrender.com/api/login', { 
         email, 
         password 
       });
