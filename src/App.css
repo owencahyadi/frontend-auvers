@@ -1,0 +1,22 @@
+/* Mereset pengaturan margin dan padding bawaan browser */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  background-color: #f8fafc;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Mematikan batasan dari Vite/React */
+#root {
+  width: 100%;
+  max-width: 100% !important; /* Memaksa layar agar full mentok kanan */
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left !important; /* Mengembalikan teks ke rata kiri */
+}
