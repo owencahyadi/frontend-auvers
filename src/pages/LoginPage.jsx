@@ -16,11 +16,14 @@ export default function LoginPage() {
     setError('');
 
     try {
-      await api.get('/sanctum/csrf-cookie', {
-        baseURL: 'https://backend-auvers.onrender.com' 
-      });
+      // 1. Ambil cookie CSRF dari domain backend Render
+      await api.get('https://backend-auvers.onrender.com/sanctum/csrf-cookie');
 
-      const response = await api.post('/login', { email, password });
+      // 2. Kirim request login ke endpoint /login Render
+      const response = await api.post('https://backend-auvers.onrender.com/login', { 
+        email, 
+        password 
+      });
       
       if (response.data.status === 'success') {
         const userData = response.data.user;
