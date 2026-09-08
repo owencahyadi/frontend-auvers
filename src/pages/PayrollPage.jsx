@@ -5,9 +5,22 @@ import * as XLSX from 'xlsx';
 export default function PayrollPage() {
   const [weeklySales, setWeeklySales] = useState(0); 
   
-  // 1. Ambil tanggal default dari localStorage, jika kosong gunakan '2026-06-22'
+  // 1. Logika mencari hari Senin minggu ini untuk default Roster Report
   const [weekStart, setWeekStart] = useState(() => {
-    return localStorage.getItem('payroll_week_start') || '2026-06-22';
+    const savedDate = localStorage.getItem('payroll_week_start');
+    if (savedDate) return savedDate;
+
+    // Jika belum ada data tersimpan, cari hari Senin minggu ini
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust jika hari Minggu
+    const monday = new Date(d.setDate(diff));
+    
+    const year = monday.getFullYear();
+    const month = String(monday.getMonth() + 1).padStart(2, '0');
+    const date = String(monday.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${date}`;
   });
   
   const [payrollData, setPayrollData] = useState([]);
@@ -21,14 +34,25 @@ export default function PayrollPage() {
   const [updateRateData, setUpdateRateData] = useState({ employee_id: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
   const [isWeeklyOnly, setIsWeeklyOnly] = useState(false);
   
-  // 2. Ambil tanggal shift terakhir dari localStorage untuk form input shift
-  const [shiftData, setShiftData] = useState({ 
-    employee_id: '', 
-    date: localStorage.getItem('last_shift_date') || '', 
-    is_unavailable: false,
-    start_1: '', end_1: '', role_1: '',
-    start_2: '', end_2: '', role_2: '',
-    applied_rate_2: ''
+  // 2. Logika mengambil tanggal hari ini persis untuk default Form Input Shift
+  const [shiftData, setShiftData] = useState(() => {
+    const savedDate = localStorage.getItem('last_shift_date');
+    
+    // Bikin format YYYY-MM-DD hari ini
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const defaultToday = `${year}-${month}-${day}`;
+
+    return { 
+      employee_id: '', 
+      date: savedDate || defaultToday, 
+      is_unavailable: false,
+      start_1: '', end_1: '', role_1: '',
+      start_2: '', end_2: '', role_2: '',
+      applied_rate_2: ''
+    };
   });
 
   const fetchData = () => {
@@ -41,7 +65,7 @@ export default function PayrollPage() {
     api.get('/employees').then(res => setEmployees(res.data.data));
   };
 
-  // 3. Simpan weekStart ke localStorage setiap kali user mengubahnya
+  // Simpan weekStart ke localStorage setiap kali user mengubahnya
   useEffect(() => { 
     localStorage.setItem('payroll_week_start', weekStart);
     fetchData(); 
@@ -130,7 +154,7 @@ export default function PayrollPage() {
     api.post('/rosters', shiftData).then(() => {
       setFeedback({ type: 'success', text: 'Shift schedule saved successfully!' });
       
-      // 4. Hanya reset form selain tanggal (biarkan tanggal tetap sama untuk input karyawan berikutnya)
+      // Hanya reset form selain tanggal (biarkan tanggal tetap sama untuk input karyawan berikutnya)
       setShiftData(prev => ({ 
         employee_id: '', 
         date: prev.date, // Pertahankan tanggal
@@ -141,7 +165,7 @@ export default function PayrollPage() {
     }).catch(() => setFeedback({ type: 'error', text: 'Failed to add shift.' }));
   };
 
-  // 5. Simpan perubahan tanggal shift ke localStorage
+  // Simpan perubahan tanggal shift ke localStorage
   const handleShiftChange = (e) => {
     const { name, value } = e.target;
     if (name === 'date') {
