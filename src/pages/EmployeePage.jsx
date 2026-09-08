@@ -11,7 +11,11 @@ export default function EmployeePage() {
   
   // STATE FORMS & SELECTION
   const [editData, setEditData] = useState({ id: '', name: '', position: '' });
-  const [employeeToDelete, setEmployeeToDelete] = useState(null); // Menyimpan data karyawan yang akan dihapus
+  const [employeeToDelete, setEmployeeToDelete] = useState(null); 
+  
+  // STATE LOADING KHUSUS UNTUK TOMBOL
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchEmployees = () => {
     setLoading(true);
@@ -31,16 +35,16 @@ export default function EmployeePage() {
   // ----------------------------------------------------
   // DELETE HANDLERS
   // ----------------------------------------------------
-  // 1. Fungsi untuk membuka modal konfirmasi delete
   const handleDeleteClick = (emp) => {
     setEmployeeToDelete(emp);
     setFeedback({ type: '', text: '' });
     setActiveModal('delete');
   };
 
-  // 2. Fungsi untuk mengeksekusi proses delete ke API
   const confirmDelete = () => {
     if (!employeeToDelete) return;
+    
+    setIsDeleting(true); 
     
     api.delete(`/employees/${employeeToDelete.id}`).then(() => {
       setFeedback({ type: 'success', text: `Employee ${employeeToDelete.name} successfully deleted!` });
@@ -51,6 +55,8 @@ export default function EmployeePage() {
       setFeedback({ type: 'error', text: 'Failed to delete employee.' });
       setActiveModal(null);
       setEmployeeToDelete(null);
+    }).finally(() => {
+      setIsDeleting(false); 
     });
   };
 
@@ -67,15 +73,20 @@ export default function EmployeePage() {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
     
+    setIsSaving(true); 
+    
     api.put(`/employees/${editData.id}`, { 
       name: editData.name, 
       position: editData.position 
     }).then(() => {
       setFeedback({ type: 'success', text: 'Employee data updated successfully!' });
       fetchEmployees();
-      // Close modal automatically after 1.5 seconds
       setTimeout(() => setActiveModal(null), 1500);
-    }).catch(() => setFeedback({ type: 'error', text: 'Failed to save changes.' }));
+    }).catch(() => {
+      setFeedback({ type: 'error', text: 'Failed to save changes.' });
+    }).finally(() => {
+      setIsSaving(false); 
+    });
   };
 
   const renderFeedback = () => {
@@ -108,7 +119,8 @@ export default function EmployeePage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
               <tr>
-                <th style={{ padding: '12px 15px', color: '#334155' }}>ID</th>
+                {/* UBAH HEADER ID MENJADI NO. */}
+                <th style={{ padding: '12px 15px', color: '#334155', width: '50px', textAlign: 'center' }}>No.</th>
                 <th style={{ padding: '12px 15px', color: '#334155' }}>Staff Name</th>
                 <th style={{ padding: '12px 15px', color: '#334155' }}>Position / Department</th>
                 <th style={{ padding: '12px 15px', color: '#334155', textAlign: 'center' }}>Actions</th>
@@ -120,9 +132,13 @@ export default function EmployeePage() {
                   <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No employee data available.</td>
                 </tr>
               ) : (
-                employees.map((emp) => (
+                // TAMBAHKAN PARAMETER index DI SINI
+                employees.map((emp, index) => (
                   <tr key={emp.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '12px 15px', color: '#64748b', fontWeight: 'bold' }}>#{emp.id}</td>
+                    {/* GUNAKAN (index + 1) UNTUK NOMOR URUT */}
+                    <td style={{ padding: '12px 15px', color: '#64748b', fontWeight: 'bold', textAlign: 'center' }}>
+                      {index + 1}
+                    </td>
                     <td style={{ padding: '12px 15px', fontWeight: 'bold', color: '#0f172a' }}>{emp.name}</td>
                     <td style={{ padding: '12px 15px', color: '#475569' }}>
                       <span style={{ background: '#e2e8f0', padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem' }}>
@@ -162,24 +178,62 @@ export default function EmployeePage() {
             background: '#fff', padding: '25px', borderRadius: '10px',
             width: '100%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', position: 'relative'
           }}>
-            <button onClick={() => setActiveModal(null)} style={{
-              position: 'absolute', top: '15px', right: '15px',
-              background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#666'
-            }}>✖</button>
+            <button 
+              onClick={() => setActiveModal(null)} 
+              disabled={isSaving}
+              style={{
+                position: 'absolute', top: '15px', right: '15px',
+                background: 'transparent', border: 'none', fontSize: '1.2rem', 
+                cursor: isSaving ? 'not-allowed' : 'pointer', color: '#666'
+              }}
+            >✖</button>
 
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#f59e0b' }}>Edit Employee Data</h3>
             
             <form onSubmit={handleUpdateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
                 <label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Staff Name</label>
-                <input type="text" value={editData.name} onChange={(e) => setEditData({...editData, name: e.target.value})} required style={{ padding: '10px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+                <input 
+                  type="text" 
+                  value={editData.name} 
+                  onChange={(e) => setEditData({...editData, name: e.target.value})} 
+                  required 
+                  disabled={isSaving}
+                  style={{ 
+                    padding: '10px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px',
+                    backgroundColor: isSaving ? '#f1f5f9' : '#fff'
+                  }} 
+                />
               </div>
               <div>
                 <label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Position / Department</label>
-                <input type="text" value={editData.position} onChange={(e) => setEditData({...editData, position: e.target.value})} required style={{ padding: '10px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+                <input 
+                  type="text" 
+                  value={editData.position} 
+                  onChange={(e) => setEditData({...editData, position: e.target.value})} 
+                  required 
+                  disabled={isSaving}
+                  style={{ 
+                    padding: '10px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px',
+                    backgroundColor: isSaving ? '#f1f5f9' : '#fff'
+                  }} 
+                />
               </div>
-              <button type="submit" style={{ padding: '12px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px', fontWeight: 'bold' }}>
-                Save Changes
+              <button 
+                type="submit" 
+                disabled={isSaving}
+                style={{ 
+                  padding: '12px', 
+                  background: isSaving ? '#94a3b8' : '#f59e0b',
+                  color: '#fff', 
+                  border: 'none', 
+                  borderRadius: '4px', 
+                  cursor: isSaving ? 'not-allowed' : 'pointer', 
+                  marginTop: '10px', 
+                  fontWeight: 'bold' 
+                }}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
           </div>
@@ -197,10 +251,15 @@ export default function EmployeePage() {
             background: '#fff', padding: '25px', borderRadius: '10px',
             width: '100%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', position: 'relative'
           }}>
-            <button onClick={() => { setActiveModal(null); setEmployeeToDelete(null); }} style={{
-              position: 'absolute', top: '15px', right: '15px',
-              background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#666'
-            }}>✖</button>
+            <button 
+              onClick={() => { setActiveModal(null); setEmployeeToDelete(null); }} 
+              disabled={isDeleting}
+              style={{
+                position: 'absolute', top: '15px', right: '15px',
+                background: 'transparent', border: 'none', fontSize: '1.2rem', 
+                cursor: isDeleting ? 'not-allowed' : 'pointer', color: '#666'
+              }}
+            >✖</button>
 
             <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#ef4444' }}>⚠️ Confirm Deletion</h3>
             
@@ -213,13 +272,29 @@ export default function EmployeePage() {
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button 
                 onClick={() => { setActiveModal(null); setEmployeeToDelete(null); }} 
-                style={{ padding: '10px 15px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                disabled={isDeleting}
+                style={{ 
+                  padding: '10px 15px', background: '#e2e8f0', color: '#475569', border: 'none', 
+                  borderRadius: '4px', cursor: isDeleting ? 'not-allowed' : 'pointer', fontWeight: 'bold' 
+                }}
+              >
                 Cancel
               </button>
+              
               <button 
                 onClick={confirmDelete} 
-                style={{ padding: '10px 15px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-                Yes, Delete!
+                disabled={isDeleting}
+                style={{ 
+                  padding: '10px 15px', 
+                  background: isDeleting ? '#94a3b8' : '#ef4444',
+                  color: '#fff', 
+                  border: 'none', 
+                  borderRadius: '4px', 
+                  cursor: isDeleting ? 'not-allowed' : 'pointer', 
+                  fontWeight: 'bold' 
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Yes, Delete!'}
               </button>
             </div>
           </div>
