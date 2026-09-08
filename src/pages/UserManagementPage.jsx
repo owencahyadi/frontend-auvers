@@ -22,7 +22,6 @@ export default function UserManagementPage() {
   const [feedback, setFeedback] = useState({ type: '', text: '' });
   const [isSaving, setIsSaving] = useState(false);
 
-  // STATE BARU: Untuk mode Edit User
   const [editingUserId, setEditingUserId] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -71,30 +70,35 @@ export default function UserManagementPage() {
     });
   };
 
-  // FUNGSI BARU: Saat tombol Edit ditekan
   const handleEditUserClick = (user) => {
     setEditingUserId(user.id);
+    
+    // Konversi aman agar JSON dari database pasti berubah menjadi Array untuk Checkbox
+    let parsedPages = [];
+    if (typeof user.visible_pages === 'string') {
+      try { parsedPages = JSON.parse(user.visible_pages); } catch(e) { parsedPages = []; }
+    } else if (Array.isArray(user.visible_pages)) {
+      parsedPages = user.visible_pages;
+    }
+
     setFormData({
       name: user.name,
       email: user.email,
-      password: '', // Sengaja dikosongkan, diisi hanya jika ingin ganti password
+      password: '', 
       role: user.role,
       store_id: user.store_id || '',
-      visible_pages: user.visible_pages || []
+      visible_pages: parsedPages
     });
     setFeedback({ type: '', text: '' });
-    // Scroll otomatis ke atas (ke arah form)
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // FUNGSI BARU: Batal Edit
   const handleCancelEditUser = () => {
     setEditingUserId(null);
     setFormData({ name: '', email: '', password: '', role: 'manager', store_id: '', visible_pages: [] });
     setFeedback({ type: '', text: '' });
   };
 
-  // Fungsi Submit diubah agar bisa menangani Create dan Update
   const handleSubmitUser = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
@@ -113,8 +117,8 @@ export default function UserManagementPage() {
     setIsSaving(true);
 
     const apiCall = editingUserId 
-      ? api.put(`/users/${editingUserId}`, formData) // Jika mode Edit
-      : api.post('/users', formData);                // Jika mode Create
+      ? api.put(`/users/${editingUserId}`, formData) 
+      : api.post('/users', formData);                
 
     apiCall
       .then(res => {
@@ -158,6 +162,11 @@ export default function UserManagementPage() {
     setEditingStoreId(store.id); setEditStoreName(store.name);
   };
 
+  const handleCancelEditStore = () => {
+    setEditingStoreId(null);
+    setEditStoreName('');
+  };
+
   const handleSaveEditStore = (id) => {
     if (!editStoreName.trim()) return;
     setIsSaving(true);
@@ -166,6 +175,20 @@ export default function UserManagementPage() {
       if (String(id) === localStorage.getItem('active_store_id')) window.location.reload();
       else fetchData();
     }).finally(() => setIsSaving(false));
+  };
+
+  // FUNGSI BARU: Delete Store
+  const handleDeleteStore = (id) => {
+    if (!window.confirm('⚠️ WARNING: Are you sure you want to delete this branch? All users and data tied to this branch might be affected!')) return;
+    
+    setIsSaving(true);
+    api.delete(`/stores/${id}`)
+      .then(res => {
+        setFeedback({ type: 'success', text: res.data.message || 'Branch deleted successfully.' });
+        fetchData();
+      })
+      .catch(err => setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to delete branch.' }))
+      .finally(() => setIsSaving(false));
   };
 
   return (
@@ -213,7 +236,7 @@ export default function UserManagementPage() {
               value={formData.password} 
               onChange={handleInputChange} 
               disabled={isSaving} 
-              required={!editingUserId} // Required hanya saat buat baru, saat edit boleh kosong
+              required={!editingUserId} 
               placeholder={editingUserId ? "Leave blank to keep current" : "Min. 6 characters"} 
               style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} 
             />
@@ -314,19 +337,36 @@ export default function UserManagementPage() {
                             {u.role === 'admin' ? <em style={{ color: '#94a3b8' }}>All Stores</em> : (u.store?.name || `Store ID: ${u.store_id}`)}
                           </div>
                         </td>
-                        <td style={{ padding: '12px 20px', color: '#475569', fontSize: '0.8rem' }}>
+                        <td style={{ padding: '12px 20px', color: '#475569', fontSize: '0.85rem' }}>
+                          {/* LOGIKA TAMPILAN LIMITED ACCESS */}
                           {u.role === 'admin' ? (
                             <span style={{ color: '#10b981', fontWeight: 'bold' }}>All Pages Allowed</span>
                           ) : (
-                            <ul style={{ margin: 0, paddingLeft: '15px', color: '#64748b' }}>
-                              {u.visible_pages && u.visible_pages.length > 0 ? (
-                                u.visible_pages.map((pId, idx) => (
-                                  <li key={idx}>{AVAILABLE_PAGES.find(p => p.id === pId)?.label || pId}</li>
-                                ))
-                              ) : (
-                                <li style={{ color: '#ef4444' }}>No Access</li>
-                              )}
-                            </ul>
+                            (() => {
+                              let pages = [];
+                              if (typeof u.visible_pages === 'string') {
+                                try { pages = JSON.parse(u.visible_pages); } catch(e) {}
+                              } else if (Array.isArray(u.visible_pages)) {
+                                pages = u.visible_pages;
+                              }
+
+                              if (pages.length === 0) {
+                                return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>No Access</span>;
+                              }
+                              
+                              if (pages.length === AVAILABLE_PAGES.length) {
+                                return <span style={{ color: '#10b981', fontWeight: 'bold' }}>Full Access</span>;
+                              }
+
+                              return (
+                                <div>
+                                  <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>Limited Access</span>
+                                  <div style={{ fontSize: '0.75rem', marginTop: '4px', color: '#64748b' }}>
+                                    {pages.length} features enabled
+                                  </div>
+                                </div>
+                              );
+                            })()
                           )}
                         </td>
                         <td style={{ padding: '12px 20px', textAlign: 'center' }}>
@@ -406,9 +446,15 @@ export default function UserManagementPage() {
                             <button onClick={handleCancelEditStore} disabled={isSaving} style={{ padding: '6px 10px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '4px', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Cancel</button>
                           </div>
                         ) : (
-                          <button onClick={() => handleEditStoreClick(store)} disabled={isSaving} style={{ padding: '6px 15px', background: isSaving ? '#e2e8f0' : '#f59e0b', color: isSaving ? '#94a3b8' : '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
-                            Edit
-                          </button>
+                          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditStoreClick(store)} disabled={isSaving} style={{ padding: '6px 12px', background: isSaving ? '#e2e8f0' : '#f59e0b', color: isSaving ? '#94a3b8' : '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
+                              Edit
+                            </button>
+                            {/* TOMBOL DELETE STORE */}
+                            <button onClick={() => handleDeleteStore(store.id)} disabled={isSaving} style={{ padding: '6px 12px', background: isSaving ? '#f1f5f9' : '#fee2e2', color: isSaving ? '#94a3b8' : '#b91c1c', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
+                              Delete
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
