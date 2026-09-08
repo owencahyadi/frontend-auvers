@@ -26,6 +26,9 @@ export default function PayrollPage() {
   const [payrollData, setPayrollData] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // STATE BARU: Mencegah double submit pada form
+  const [isSaving, setIsSaving] = useState(false);
 
   const [activeModal, setActiveModal] = useState(null); 
   const [feedback, setFeedback] = useState({ type: '', text: '' }); 
@@ -73,6 +76,7 @@ export default function PayrollPage() {
 
   useEffect(() => {
     if (activeModal === 'shift' && shiftData.employee_id && shiftData.date) {
+      // Kita bisa disable cek ini juga jika sedang saving, tapi GET request ini ringan
       api.get(`/rosters/calendar?start_date=${shiftData.date}`)
         .then(res => {
           const existingShift = res.data.data.find(
@@ -108,6 +112,7 @@ export default function PayrollPage() {
   }, [shiftData.employee_id, shiftData.date, activeModal]);
 
   const closeModal = () => {
+    if (isSaving) return; // Mencegah modal tertutup saat sedang loading
     setActiveModal(null);
     setFeedback({ type: '', text: '' }); 
   };
@@ -115,11 +120,17 @@ export default function PayrollPage() {
   const handleStaffSubmit = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
+    setIsSaving(true); // Aktifkan Loading
+
     api.post('/employees', staffData).then(() => {
       setFeedback({ type: 'success', text: 'New employee successfully added!' });
       setStaffData({ name: '', position: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
       fetchData();
-    }).catch(() => setFeedback({ type: 'error', text: 'Failed to save employee.' }));
+    }).catch(() => {
+      setFeedback({ type: 'error', text: 'Failed to save employee.' });
+    }).finally(() => {
+      setIsSaving(false); // Matikan Loading
+    });
   };
 
   const handleUpdateRateSubmit = (e) => {
@@ -129,6 +140,7 @@ export default function PayrollPage() {
       return;
     }
     setFeedback({ type: '', text: '' });
+    setIsSaving(true); // Aktifkan Loading
     
     if (isWeeklyOnly) {
       api.put(`/employees/${updateRateData.employee_id}/weekly-rates`, { ...updateRateData, start_date: weekStart })
@@ -137,24 +149,30 @@ export default function PayrollPage() {
         setUpdateRateData({ employee_id: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
         setIsWeeklyOnly(false);
         fetchData(); 
-      }).catch(err => setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to update special rate.' }));
+      }).catch(err => {
+        setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to update special rate.' });
+      }).finally(() => setIsSaving(false)); // Matikan Loading
     } else {
       api.put(`/employees/${updateRateData.employee_id}/rates`, updateRateData)
       .then(() => {
         setFeedback({ type: 'success', text: 'Master Rate updated permanently!' });
         setUpdateRateData({ employee_id: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
         fetchData(); 
-      }).catch(() => setFeedback({ type: 'error', text: 'Failed to update master rate.' }));
+      }).catch(() => {
+        setFeedback({ type: 'error', text: 'Failed to update master rate.' });
+      }).finally(() => setIsSaving(false)); // Matikan Loading
     }
   };
 
   const handleShiftSubmit = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
+    setIsSaving(true); // Aktifkan Loading
+
     api.post('/rosters', shiftData).then(() => {
       setFeedback({ type: 'success', text: 'Shift schedule saved successfully!' });
       
-      // Hanya reset form selain tanggal (biarkan tanggal tetap sama untuk input karyawan berikutnya)
+      // Hanya reset form selain tanggal
       setShiftData(prev => ({ 
         employee_id: '', 
         date: prev.date, // Pertahankan tanggal
@@ -162,10 +180,11 @@ export default function PayrollPage() {
         start_1: '', end_1: '', role_1: '', start_2: '', end_2: '', role_2: '', applied_rate_2: ''
       }));
       fetchData();
-    }).catch(() => setFeedback({ type: 'error', text: 'Failed to add shift.' }));
+    }).catch(() => {
+      setFeedback({ type: 'error', text: 'Failed to add shift.' });
+    }).finally(() => setIsSaving(false)); // Matikan Loading
   };
 
-  // Simpan perubahan tanggal shift ke localStorage
   const handleShiftChange = (e) => {
     const { name, value } = e.target;
     if (name === 'date') {
@@ -290,34 +309,39 @@ export default function PayrollPage() {
       <h1 style={{ marginBottom: '40px' }}>F&B Payroll Dashboard</h1>
       
       <div style={{ display: 'flex', gap: '15px', marginBottom: '30px', flexWrap: 'wrap' }}>
-        <button onClick={() => { setActiveModal('staff'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>+ Add Employee</button>
-        <button onClick={() => { setActiveModal('rate'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: '#e65100', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>$ Update Staff Rates</button>
-        <button onClick={() => { setActiveModal('shift'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>📅 Input Shift Roster</button>
+        <button disabled={loading} onClick={() => { setActiveModal('staff'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>+ Add Employee</button>
+        <button disabled={loading} onClick={() => { setActiveModal('rate'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#e65100', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>$ Update Staff Rates</button>
+        <button disabled={loading} onClick={() => { setActiveModal('shift'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#007bff', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>📅 Input Shift Roster</button>
       </div>
 
       {activeModal && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
             <div style={{ background: '#fff', padding: '25px', borderRadius: '10px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', position: 'relative' }}>
-              <button onClick={closeModal} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#666' }}>✖</button>
+              <button 
+                onClick={closeModal} 
+                disabled={isSaving} 
+                style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: isSaving ? 'not-allowed' : 'pointer', color: '#666' }}>✖</button>
 
               {activeModal === 'staff' && (
                 <div>
                   <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#0d47a1' }}>Add New Employee</h3>
                   {renderFeedback()}
                   <form onSubmit={handleStaffSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <div><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Staff Name</label><input type="text" name="name" value={staffData.name} onChange={(e) => setStaffData({...staffData, name: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
-                    <div><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Position</label><input type="text" name="position" value={staffData.position} onChange={(e) => setStaffData({...staffData, position: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
+                    <div><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Staff Name</label><input type="text" name="name" value={staffData.name} onChange={(e) => setStaffData({...staffData, name: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
+                    <div><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Position</label><input type="text" name="position" value={staffData.position} onChange={(e) => setStaffData({...staffData, position: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     <div style={{ display: 'flex', gap: '10px' }}>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Wkday ($)</label><input type="number" step="0.01" name="base_rate" value={staffData.base_rate} onChange={(e) => setStaffData({...staffData, base_rate: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sat ($)</label><input type="number" step="0.01" name="rate_sat" value={staffData.rate_sat} onChange={(e) => setStaffData({...staffData, rate_sat: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sun ($)</label><input type="number" step="0.01" name="rate_sun" value={staffData.rate_sun} onChange={(e) => setStaffData({...staffData, rate_sun: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Wkday ($)</label><input type="number" step="0.01" name="base_rate" value={staffData.base_rate} onChange={(e) => setStaffData({...staffData, base_rate: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sat ($)</label><input type="number" step="0.01" name="rate_sat" value={staffData.rate_sat} onChange={(e) => setStaffData({...staffData, rate_sat: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sun ($)</label><input type="number" step="0.01" name="rate_sun" value={staffData.rate_sun} onChange={(e) => setStaffData({...staffData, rate_sun: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>OT Rate ($)</label><input type="number" step="0.01" name="overtime_rate" value={staffData.overtime_rate} onChange={(e) => setStaffData({...staffData, overtime_rate: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Max Normal Hrs</label><input type="number" step="1" name="ot_threshold" value={staffData.ot_threshold} onChange={(e) => setStaffData({...staffData, ot_threshold: e.target.value})} required placeholder="e.g. 38" style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>OT Rate ($)</label><input type="number" step="0.01" name="overtime_rate" value={staffData.overtime_rate} onChange={(e) => setStaffData({...staffData, overtime_rate: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Max Normal Hrs</label><input type="number" step="1" name="ot_threshold" value={staffData.ot_threshold} onChange={(e) => setStaffData({...staffData, ot_threshold: e.target.value})} required disabled={isSaving} placeholder="e.g. 38" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     </div>
                     
-                    <button type="submit" style={{ padding: '10px', background: '#0d47a1', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px' }}>Save Employee</button>
+                    <button type="submit" disabled={isSaving} style={{ padding: '10px', background: isSaving ? '#94a3b8' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '4px', cursor: isSaving ? 'not-allowed' : 'pointer', marginTop: '10px', fontWeight: 'bold' }}>
+                      {isSaving ? 'Saving...' : 'Save Employee'}
+                    </button>
                   </form>
                 </div>
               )}
@@ -327,25 +351,28 @@ export default function PayrollPage() {
                   <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#e65100' }}>Update Staff Rates</h3>
                   {renderFeedback()}
                   <form onSubmit={handleUpdateRateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <div><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Select Staff</label><select name="employee_id" value={updateRateData.employee_id} onChange={(e) => setUpdateRateData({...updateRateData, employee_id: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }}>
+                    <div><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Select Staff</label><select name="employee_id" value={updateRateData.employee_id} onChange={(e) => setUpdateRateData({...updateRateData, employee_id: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
                       <option value="">-- Select Staff --</option>
                       {employees.map(emp => (<option key={emp.id} value={emp.id}>{emp.name}</option>))}
                     </select></div>
                     <div style={{ display: 'flex', gap: '10px' }}>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Wkday ($)</label><input type="number" step="0.01" name="base_rate" value={updateRateData.base_rate} onChange={(e) => setUpdateRateData({...updateRateData, base_rate: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sat ($)</label><input type="number" step="0.01" name="rate_sat" value={updateRateData.rate_sat} onChange={(e) => setUpdateRateData({...updateRateData, rate_sat: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sun ($)</label><input type="number" step="0.01" name="rate_sun" value={updateRateData.rate_sun} onChange={(e) => setUpdateRateData({...updateRateData, rate_sun: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Wkday ($)</label><input type="number" step="0.01" name="base_rate" value={updateRateData.base_rate} onChange={(e) => setUpdateRateData({...updateRateData, base_rate: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sat ($)</label><input type="number" step="0.01" name="rate_sat" value={updateRateData.rate_sat} onChange={(e) => setUpdateRateData({...updateRateData, rate_sat: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sun ($)</label><input type="number" step="0.01" name="rate_sun" value={updateRateData.rate_sun} onChange={(e) => setUpdateRateData({...updateRateData, rate_sun: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>OT Rate ($)</label><input type="number" step="0.01" name="overtime_rate" value={updateRateData.overtime_rate} onChange={(e) => setUpdateRateData({...updateRateData, overtime_rate: e.target.value})} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Max Normal Hrs</label><input type="number" step="1" name="ot_threshold" value={updateRateData.ot_threshold} onChange={(e) => setUpdateRateData({...updateRateData, ot_threshold: e.target.value})} required placeholder="e.g. 38" style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>OT Rate ($)</label><input type="number" step="0.01" name="overtime_rate" value={updateRateData.overtime_rate} onChange={(e) => setUpdateRateData({...updateRateData, overtime_rate: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Max Normal Hrs</label><input type="number" step="1" name="ot_threshold" value={updateRateData.ot_threshold} onChange={(e) => setUpdateRateData({...updateRateData, ot_threshold: e.target.value})} required disabled={isSaving} placeholder="e.g. 38" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     </div>
 
-                    <label style={{ fontSize: '0.9em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#fff3e0', padding: '10px', borderRadius: '5px' }}>
-                      <input type="checkbox" checked={isWeeklyOnly} onChange={(e) => setIsWeeklyOnly(e.target.checked)} />
+                    <label style={{ fontSize: '0.9em', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#fff3e0', padding: '10px', borderRadius: '5px' }}>
+                      <input type="checkbox" checked={isWeeklyOnly} onChange={(e) => setIsWeeklyOnly(e.target.checked)} disabled={isSaving} />
                       Apply only for the currently selected week
                     </label>
-                    <button type="submit" style={{ padding: '10px', background: '#e65100', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px' }}>Update Rate</button>
+                    
+                    <button type="submit" disabled={isSaving} style={{ padding: '10px', background: isSaving ? '#94a3b8' : '#e65100', color: '#fff', border: 'none', borderRadius: '4px', cursor: isSaving ? 'not-allowed' : 'pointer', marginTop: '10px', fontWeight: 'bold' }}>
+                      {isSaving ? 'Updating...' : 'Update Rate'}
+                    </button>
                   </form>
                 </div>
               )}
@@ -361,15 +388,15 @@ export default function PayrollPage() {
                     return (
                       <form onSubmit={handleShiftSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{ display: 'flex', gap: '10px' }}>
-                          <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Select Staff</label><select name="employee_id" value={shiftData.employee_id} onChange={handleShiftChange} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }}>
+                          <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Select Staff</label><select name="employee_id" value={shiftData.employee_id} onChange={handleShiftChange} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
                             <option value="">-- Select --</option>
                             {employees.map(emp => (<option key={emp.id} value={emp.id}>{emp.name}</option>))}
                           </select></div>
-                          <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Date</label><input type="date" name="date" value={shiftData.date} onChange={handleShiftChange} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }} /></div>
+                          <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Date</label><input type="date" name="date" value={shiftData.date} onChange={handleShiftChange} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                         </div>
                         
-                        <label style={{ fontSize: '0.9em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#d32f2f', fontWeight: 'bold', background: '#ffebee', padding: '10px', borderRadius: '5px' }}>
-                          <input type="checkbox" name="is_unavailable" checked={shiftData.is_unavailable} onChange={(e) => setShiftData({...shiftData, is_unavailable: e.target.checked})} />
+                        <label style={{ fontSize: '0.9em', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#d32f2f', fontWeight: 'bold', background: '#ffebee', padding: '10px', borderRadius: '5px' }}>
+                          <input type="checkbox" name="is_unavailable" checked={shiftData.is_unavailable} onChange={(e) => setShiftData({...shiftData, is_unavailable: e.target.checked})} disabled={isSaving} />
                           Mark as Unavailable (Off / Leave)
                         </label>
                         
@@ -379,10 +406,10 @@ export default function PayrollPage() {
                             <div style={{ marginBottom: '15px' }}>
                               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155' }}>Shift 1 (Primary):</label>
                               <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
-                                <input type="text" name="start_1" value={shiftData.start_1} onChange={handleTimeInput} required placeholder="08:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" title="Format: HH:MM (e.g., 08:30)" style={{ padding: '8px', flex: 1, minWidth: 0, boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', textAlign: 'center', letterSpacing: '2px', fontWeight: 'bold' }} />
-                                <input type="text" name="end_1" value={shiftData.end_1} onChange={handleTimeInput} required placeholder="15:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" title="Format: HH:MM (e.g., 15:00)" style={{ padding: '8px', flex: 1, minWidth: 0, boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', textAlign: 'center', letterSpacing: '2px', fontWeight: 'bold' }} />
+                                <input type="text" name="start_1" value={shiftData.start_1} onChange={handleTimeInput} required disabled={isSaving} placeholder="08:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" title="Format: HH:MM (e.g., 08:30)" style={{ padding: '8px', flex: 1, minWidth: 0, boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', textAlign: 'center', letterSpacing: '2px', fontWeight: 'bold', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
+                                <input type="text" name="end_1" value={shiftData.end_1} onChange={handleTimeInput} required disabled={isSaving} placeholder="15:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" title="Format: HH:MM (e.g., 15:00)" style={{ padding: '8px', flex: 1, minWidth: 0, boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', textAlign: 'center', letterSpacing: '2px', fontWeight: 'bold', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
                               </div>
-                              <input type="text" name="role_1" value={shiftData.role_1} onChange={handleShiftChange} placeholder="Role (e.g., Pan, Larder)" required style={{ padding: '8px', width: '100%', marginTop: '8px', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+                              <input type="text" name="role_1" value={shiftData.role_1} onChange={handleShiftChange} placeholder="Role (e.g., Pan, Larder)" required disabled={isSaving} style={{ padding: '8px', width: '100%', marginTop: '8px', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
                             </div>
 
                             <hr style={{ borderTop: '1px dashed #cbd5e1', borderBottom: 'none', margin: '15px 0' }} />
@@ -390,22 +417,24 @@ export default function PayrollPage() {
                             <div>
                               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#64748b' }}>Shift 2 (Optional - If Split):</label>
                               <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
-                                <input type="text" name="start_2" value={shiftData.start_2} onChange={handleTimeInput} placeholder="16:30" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" title="Format: HH:MM (e.g., 16:30)" style={{ padding: '8px', flex: 1, minWidth: 0, boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', textAlign: 'center', letterSpacing: '2px', fontWeight: 'bold' }} />
-                                <input type="text" name="end_2" value={shiftData.end_2} onChange={handleTimeInput} placeholder="21:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" title="Format: HH:MM (e.g., 21:00)" style={{ padding: '8px', flex: 1, minWidth: 0, boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', textAlign: 'center', letterSpacing: '2px', fontWeight: 'bold' }} />
+                                <input type="text" name="start_2" value={shiftData.start_2} onChange={handleTimeInput} disabled={isSaving} placeholder="16:30" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" title="Format: HH:MM (e.g., 16:30)" style={{ padding: '8px', flex: 1, minWidth: 0, boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', textAlign: 'center', letterSpacing: '2px', fontWeight: 'bold', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
+                                <input type="text" name="end_2" value={shiftData.end_2} onChange={handleTimeInput} disabled={isSaving} placeholder="21:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" title="Format: HH:MM (e.g., 21:00)" style={{ padding: '8px', flex: 1, minWidth: 0, boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', textAlign: 'center', letterSpacing: '2px', fontWeight: 'bold', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
                               </div>
-                              <input type="text" name="role_2" value={shiftData.role_2} onChange={handleShiftChange} placeholder="Shift 2 Role (Optional)" style={{ padding: '8px', width: '100%', marginTop: '8px', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+                              <input type="text" name="role_2" value={shiftData.role_2} onChange={handleShiftChange} disabled={isSaving} placeholder="Shift 2 Role (Optional)" style={{ padding: '8px', width: '100%', marginTop: '8px', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
                               
                               {isSunday && (
                                 <div style={{ marginTop: '10px', background: '#fff3e0', padding: '10px', borderRadius: '6px', border: '1px solid #ffe0b2' }}>
                                   <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#e65100' }}>Custom Rate / Hour for Sunday Shift 2 ($)</label>
-                                  <input type="number" step="0.01" name="applied_rate_2" value={shiftData.applied_rate_2} onChange={handleShiftChange} placeholder="Leave blank for normal Sunday rate" style={{ padding: '8px', width: '100%', marginTop: '5px', boxSizing: 'border-box', border: '1px solid #ffcc80', borderRadius: '4px' }} />
+                                  <input type="number" step="0.01" name="applied_rate_2" value={shiftData.applied_rate_2} onChange={handleShiftChange} disabled={isSaving} placeholder="Leave blank for normal Sunday rate" style={{ padding: '8px', width: '100%', marginTop: '5px', boxSizing: 'border-box', border: '1px solid #ffcc80', borderRadius: '4px', backgroundColor: isSaving ? '#fff' : '#fff' }} />
                                 </div>
                               )}
                             </div>
 
                           </div>
                         )}
-                        <button type="submit" style={{ padding: '12px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px', fontWeight: 'bold' }}>Save Schedule</button>
+                        <button type="submit" disabled={isSaving} style={{ padding: '12px', background: isSaving ? '#94a3b8' : '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: isSaving ? 'not-allowed' : 'pointer', marginTop: '10px', fontWeight: 'bold' }}>
+                          {isSaving ? 'Saving...' : 'Save Schedule'}
+                        </button>
                       </form>
                     );
                   })()}
@@ -420,12 +449,15 @@ export default function PayrollPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <h3 style={{ margin: 0 }}>Roster & Payroll Report</h3>
           <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-            <button onClick={handleDownloadExcel} style={{ padding: '8px 15px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+            <button 
+              onClick={handleDownloadExcel} 
+              disabled={loading} 
+              style={{ padding: '8px 15px', background: loading ? '#94a3b8' : '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
               📥 Download Excel
             </button>
             <div style={{ background: '#e3f2fd', padding: '10px', borderRadius: '5px', display: 'flex', alignItems: 'center' }}>
               <label style={{ fontWeight: 'bold', marginRight: '10px' }}>Select Week Start (Monday):</label>
-              <input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} style={{ padding: '5px', fontSize: '1rem', cursor: 'pointer', border: '1px solid #90caf9', borderRadius: '4px' }} />
+              <input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} disabled={loading} style={{ padding: '5px', fontSize: '1rem', cursor: loading ? 'not-allowed' : 'pointer', border: '1px solid #90caf9', borderRadius: '4px', backgroundColor: loading ? '#f1f5f9' : '#fff' }} />
             </div>
           </div>
         </div>
