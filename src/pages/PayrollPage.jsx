@@ -4,7 +4,11 @@ import * as XLSX from 'xlsx';
 
 export default function PayrollPage() {
   const [weeklySales, setWeeklySales] = useState(0); 
-  const [weekStart, setWeekStart] = useState('2026-06-22');
+  
+  // 1. Ambil tanggal default dari localStorage, jika kosong gunakan '2026-06-22'
+  const [weekStart, setWeekStart] = useState(() => {
+    return localStorage.getItem('payroll_week_start') || '2026-06-22';
+  });
   
   const [payrollData, setPayrollData] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -17,9 +21,11 @@ export default function PayrollPage() {
   const [updateRateData, setUpdateRateData] = useState({ employee_id: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
   const [isWeeklyOnly, setIsWeeklyOnly] = useState(false);
   
-  // Menambahkan state applied_rate_2
+  // 2. Ambil tanggal shift terakhir dari localStorage untuk form input shift
   const [shiftData, setShiftData] = useState({ 
-    employee_id: '', date: '', is_unavailable: false,
+    employee_id: '', 
+    date: localStorage.getItem('last_shift_date') || '', 
+    is_unavailable: false,
     start_1: '', end_1: '', role_1: '',
     start_2: '', end_2: '', role_2: '',
     applied_rate_2: ''
@@ -35,7 +41,9 @@ export default function PayrollPage() {
     api.get('/employees').then(res => setEmployees(res.data.data));
   };
 
+  // 3. Simpan weekStart ke localStorage setiap kali user mengubahnya
   useEffect(() => { 
+    localStorage.setItem('payroll_week_start', weekStart);
     fetchData(); 
   }, [weekStart]);
 
@@ -57,7 +65,7 @@ export default function PayrollPage() {
               start_2: existingShift.start_2 ? existingShift.start_2.substring(0, 5) : '',
               end_2: existingShift.end_2 ? existingShift.end_2.substring(0, 5) : '',
               role_2: existingShift.role_2 || '',
-              applied_rate_2: existingShift.applied_rate_2 || '' // Load rate shift 2
+              applied_rate_2: existingShift.applied_rate_2 || '' 
             }));
             setFeedback({ type: 'success', text: 'Schedule found! You can edit or add Shift 2.' });
           } else {
@@ -66,7 +74,7 @@ export default function PayrollPage() {
               is_unavailable: false,
               start_1: '', end_1: '', role_1: '',
               start_2: '', end_2: '', role_2: '',
-              applied_rate_2: '' // Reset rate shift 2
+              applied_rate_2: '' 
             }));
             setFeedback({ type: '', text: '' });
           }
@@ -121,15 +129,26 @@ export default function PayrollPage() {
     setFeedback({ type: '', text: '' });
     api.post('/rosters', shiftData).then(() => {
       setFeedback({ type: 'success', text: 'Shift schedule saved successfully!' });
-      setShiftData({ 
-        employee_id: '', date: '', is_unavailable: false,
+      
+      // 4. Hanya reset form selain tanggal (biarkan tanggal tetap sama untuk input karyawan berikutnya)
+      setShiftData(prev => ({ 
+        employee_id: '', 
+        date: prev.date, // Pertahankan tanggal
+        is_unavailable: false,
         start_1: '', end_1: '', role_1: '', start_2: '', end_2: '', role_2: '', applied_rate_2: ''
-      });
+      }));
       fetchData();
     }).catch(() => setFeedback({ type: 'error', text: 'Failed to add shift.' }));
   };
 
-  const handleShiftChange = (e) => setShiftData({ ...shiftData, [e.target.name]: e.target.value });
+  // 5. Simpan perubahan tanggal shift ke localStorage
+  const handleShiftChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'date') {
+      localStorage.setItem('last_shift_date', value);
+    }
+    setShiftData({ ...shiftData, [name]: value });
+  };
 
   const handleTimeInput = (e) => {
     const { name, value } = e.target;
@@ -312,9 +331,7 @@ export default function PayrollPage() {
                   <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#007bff' }}>Input Shift Schedule</h3>
                   {renderFeedback()}
                   
-                  {/* Pengecekan otomatis apakah tanggal yang dipilih adalah hari Minggu */}
                   {(() => {
-                    // T12:00:00 ditambahkan agar konversi tanggal di berbagai zona waktu tetap akurat (tidak bergeser hari)
                     const isSunday = shiftData.date && new Date(shiftData.date + 'T12:00:00').getDay() === 0;
 
                     return (
@@ -354,7 +371,6 @@ export default function PayrollPage() {
                               </div>
                               <input type="text" name="role_2" value={shiftData.role_2} onChange={handleShiftChange} placeholder="Shift 2 Role (Optional)" style={{ padding: '8px', width: '100%', marginTop: '8px', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
                               
-                              {/* KOTAK INPUT CUSTOM RATE SHIFT 2 (HANYA MUNCUL DI HARI MINGGU) */}
                               {isSunday && (
                                 <div style={{ marginTop: '10px', background: '#fff3e0', padding: '10px', borderRadius: '6px', border: '1px solid #ffe0b2' }}>
                                   <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#e65100' }}>Custom Rate / Hour for Sunday Shift 2 ($)</label>
