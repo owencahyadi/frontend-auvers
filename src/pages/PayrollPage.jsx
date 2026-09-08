@@ -30,6 +30,16 @@ export default function PayrollPage() {
   // STATE BARU: Mencegah double submit pada form
   const [isSaving, setIsSaving] = useState(false);
 
+  // --- LOGIKA HAK AKSES (PERMISSIONS) ---
+  const currentUser = JSON.parse(localStorage.getItem('user')) || {};
+  const isSuperAdmin = currentUser.role === 'admin';
+  const myPermissions = currentUser.visible_pages || [];
+
+  // Tentukan apakah user boleh melihat tombol-tombol ini
+  const canAddStaff = isSuperAdmin || myPermissions.includes('act_add_staff');
+  const canEditRate = isSuperAdmin || myPermissions.includes('act_edit_rate');
+  const canInputShift = isSuperAdmin || myPermissions.includes('act_input_shift');
+
   const [activeModal, setActiveModal] = useState(null); 
   const [feedback, setFeedback] = useState({ type: '', text: '' }); 
 
@@ -308,10 +318,27 @@ export default function PayrollPage() {
     <div>
       <h1 style={{ marginBottom: '40px' }}>F&B Payroll Dashboard</h1>
       
+      {/* KUMPULAN TOMBOL AKSI DENGAN GRANULAR PERMISSIONS */}
       <div style={{ display: 'flex', gap: '15px', marginBottom: '30px', flexWrap: 'wrap' }}>
-        <button disabled={loading} onClick={() => { setActiveModal('staff'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>+ Add Employee</button>
-        <button disabled={loading} onClick={() => { setActiveModal('rate'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#e65100', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>$ Update Staff Rates</button>
-        <button disabled={loading} onClick={() => { setActiveModal('shift'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#007bff', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>📅 Input Shift Roster</button>
+        
+        {canAddStaff && (
+          <button disabled={loading} onClick={() => { setActiveModal('staff'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+            + Add Employee
+          </button>
+        )}
+
+        {canEditRate && (
+          <button disabled={loading} onClick={() => { setActiveModal('rate'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#e65100', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+            $ Update Staff Rates
+          </button>
+        )}
+
+        {canInputShift && (
+          <button disabled={loading} onClick={() => { setActiveModal('shift'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#007bff', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+            📅 Input Shift Roster
+          </button>
+        )}
+
       </div>
 
       {activeModal && (

@@ -1,24 +1,35 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
 
+// Daftar semua halaman yang tersedia di sistem Anda
+const AVAILABLE_PAGES = [
+  { id: 'profit_loss', label: '📊 View Profit & Loss (P&L)' },
+  { id: 'employees', label: '👥 View Employee Master Data' },
+  { id: 'suppliers', label: '📦 View Supplier Catalogue' },
+  { id: 'purchases', label: '🛒 View Purchases / COGS' },
+  { id: 'operational_costs', label: '⚡ View Operational Costs' },
+  
+  // -- GRUP PAYROLL & ROSTER --
+  { id: 'roster_payroll', label: '📅 VIEW: Roster & Payroll Page' },
+  { id: 'act_add_staff', label: 'ㅤ ↳ ACTION: Add New Employee' },
+  { id: 'act_edit_rate', label: 'ㅤ ↳ ACTION: Update Staff Rates' },
+  { id: 'act_input_shift', label: 'ㅤ ↳ ACTION: Input Shift Roster' },
+];
+
 export default function UserManagementPage() {
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState({ type: '', text: '' });
-  
-  // State untuk disable button saat proses berjalan
   const [isSaving, setIsSaving] = useState(false);
 
-  // State untuk form user
+  // State form ditambahkan 'visible_pages'
   const [formData, setFormData] = useState({
-    name: '', email: '', password: '', role: 'manager', store_id: ''
+    name: '', email: '', password: '', role: 'manager', store_id: '',
+    visible_pages: [] // Array kosong secara default
   });
 
-  // State untuk form tambah toko baru
   const [newStoreName, setNewStoreName] = useState('');
-
-  // State untuk mode edit nama toko (inline edit)
   const [editingStoreId, setEditingStoreId] = useState(null);
   const [editStoreName, setEditStoreName] = useState('');
 
@@ -32,16 +43,13 @@ export default function UserManagementPage() {
       setUsers(usersRes.data.data || []);
       setStores(storesRes.data.data || []);
     } catch (err) {
-      console.error('Failed to fetch data:', err);
       setFeedback({ type: 'error', text: 'Failed to load user management data.' });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   // ----------------------------------------------------
   // USER HANDLERS
@@ -51,20 +59,38 @@ export default function UserManagementPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Fungsi khusus untuk menangani centang hak akses halaman
+  const handleCheckboxChange = (pageId) => {
+    setFormData(prev => {
+      const currentPages = prev.visible_pages || [];
+      if (currentPages.includes(pageId)) {
+        return { ...prev, visible_pages: currentPages.filter(id => id !== pageId) }; // Uncheck
+      } else {
+        return { ...prev, visible_pages: [...currentPages, pageId] }; // Check
+      }
+    });
+  };
+
   const handleCreateUser = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
 
-    if (formData.role === 'manager' && !formData.store_id) {
-      setFeedback({ type: 'error', text: 'Please assign a store for the manager.' });
-      return;
+    if (formData.role === 'manager') {
+      if (!formData.store_id) {
+        setFeedback({ type: 'error', text: 'Please assign a store for the manager.' });
+        return;
+      }
+      if (formData.visible_pages.length === 0) {
+        setFeedback({ type: 'error', text: 'Please select at least one page for the manager to access.' });
+        return;
+      }
     }
 
     setIsSaving(true);
     api.post('/users', formData)
       .then(res => {
         setFeedback({ type: 'success', text: res.data.message });
-        setFormData({ name: '', email: '', password: '', role: 'manager', store_id: '' });
+        setFormData({ name: '', email: '', password: '', role: 'manager', store_id: '', visible_pages: [] });
         fetchData();
       })
       .catch(err => {
@@ -90,58 +116,29 @@ export default function UserManagementPage() {
   };
 
   // ----------------------------------------------------
-  // STORE / BRANCH HANDLERS
+  // STORE HANDLERS (Sama seperti sebelumnya)
   // ----------------------------------------------------
   const handleCreateStore = (e) => {
     e.preventDefault();
     if (!newStoreName.trim()) return;
-
-    setFeedback({ type: '', text: '' });
     setIsSaving(true);
-
-    api.post('/stores', { name: newStoreName })
-      .then(res => {
-        setFeedback({ type: 'success', text: res.data.message || 'Branch added successfully!' });
-        setNewStoreName('');
-        fetchData();
-      })
-      .catch(() => setFeedback({ type: 'error', text: 'Failed to add new branch.' }))
-      .finally(() => setIsSaving(false));
+    api.post('/stores', { name: newStoreName }).then(() => {
+      setNewStoreName(''); fetchData();
+    }).finally(() => setIsSaving(false));
   };
 
   const handleEditStoreClick = (store) => {
-    setEditingStoreId(store.id);
-    setEditStoreName(store.name);
-  };
-
-  const handleCancelEditStore = () => {
-    setEditingStoreId(null);
-    setEditStoreName('');
+    setEditingStoreId(store.id); setEditStoreName(store.name);
   };
 
   const handleSaveEditStore = (id) => {
     if (!editStoreName.trim()) return;
-
-    setFeedback({ type: '', text: '' });
     setIsSaving(true);
-
-    api.put(`/stores/${id}`, { name: editStoreName })
-      .then(res => {
-        setFeedback({ type: 'success', text: res.data.message || 'Branch updated successfully!' });
-        setEditingStoreId(null);
-        
-        // PENTING: Cek apakah cabang yang diedit adalah cabang yang sedang dibuka
-        const activeStoreId = localStorage.getItem('active_store_id');
-        if (String(id) === activeStoreId) {
-          // Refresh halaman secara otomatis agar tulisan di Sidebar ikut terupdate
-          window.location.reload();
-        } else {
-          // Jika yang diedit cabang lain, cukup refresh tabelnya saja
-          fetchData();
-        }
-      })
-      .catch(() => setFeedback({ type: 'error', text: 'Failed to update branch name.' }))
-      .finally(() => setIsSaving(false));
+    api.put(`/stores/${id}`, { name: editStoreName }).then(() => {
+      setEditingStoreId(null);
+      if (String(id) === localStorage.getItem('active_store_id')) window.location.reload();
+      else fetchData();
+    }).finally(() => setIsSaving(false));
   };
 
   return (
@@ -161,14 +158,14 @@ export default function UserManagementPage() {
       <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '30px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#1e293b' }}>+ Add New User Account</h3>
         
-        <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', alignItems: 'flex-end' }}>
+        <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', alignItems: 'flex-start' }}>
           <div>
             <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Full Name</label>
             <input type="text" name="name" value={formData.name} onChange={handleInputChange} disabled={isSaving} required placeholder="John Doe" style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
           </div>
 
           <div>
-            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Email Address</label>
+            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Email</label>
             <input type="email" name="email" value={formData.email} onChange={handleInputChange} disabled={isSaving} required placeholder="user@resto.com" style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
           </div>
 
@@ -180,25 +177,52 @@ export default function UserManagementPage() {
           <div>
             <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Role</label>
             <select name="role" value={formData.role} onChange={handleInputChange} disabled={isSaving} style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
-              <option value="manager">Manager</option>
+              <option value="manager">Branch Manager</option>
               <option value="admin">Super Admin</option>
             </select>
           </div>
 
+          {/* KOTAK AKSES KHUSUS MANAGER */}
           {formData.role === 'manager' && (
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Assigned Branch</label>
-              <select name="store_id" value={formData.store_id} onChange={handleInputChange} disabled={isSaving} required style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
-                <option value="">-- Select Store --</option>
-                {stores.map(store => (
-                  <option key={store.id} value={store.id}>{store.name}</option>
-                ))}
-              </select>
+            <div style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                
+                {/* Pilih Toko */}
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#0f172a', display: 'block', marginBottom: '10px' }}>1. Assign Branch</label>
+                  <select name="store_id" value={formData.store_id} onChange={handleInputChange} disabled={isSaving} required style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
+                    <option value="">-- Select Branch --</option>
+                    {stores.map(store => (
+                      <option key={store.id} value={store.id}>{store.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Pilih Menu Akses */}
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#0f172a', display: 'block', marginBottom: '10px' }}>2. Page Access Permissions</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    {AVAILABLE_PAGES.map(page => (
+                      <label key={page.id} style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={formData.visible_pages.includes(page.id)}
+                          onChange={() => handleCheckboxChange(page.id)}
+                          disabled={isSaving}
+                          style={{ marginRight: '8px' }}
+                        />
+                        {page.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button type="submit" disabled={isSaving} style={{ width: '100%', padding: '11px', background: isSaving ? '#94a3b8' : '#2563eb', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+            <button type="submit" disabled={isSaving} style={{ padding: '12px 30px', background: isSaving ? '#94a3b8' : '#2563eb', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
               {isSaving ? 'Creating...' : 'Create Account'}
             </button>
           </div>
@@ -220,8 +244,8 @@ export default function UserManagementPage() {
                 <thead>
                   <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', fontSize: '0.85rem' }}>
                     <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Name</th>
-                    <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Role</th>
-                    <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Assigned Branch</th>
+                    <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Role & Branch</th>
+                    <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Page Access</th>
                     <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
@@ -238,12 +262,27 @@ export default function UserManagementPage() {
                           <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{u.email}</div>
                         </td>
                         <td style={{ padding: '12px 20px' }}>
-                          <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: u.role === 'admin' ? '#dbeafe' : '#fef3c7', color: u.role === 'admin' ? '#1e40af' : '#92400e' }}>
+                          <span style={{ display: 'inline-block', marginBottom: '5px', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', backgroundColor: u.role === 'admin' ? '#dbeafe' : '#fef3c7', color: u.role === 'admin' ? '#1e40af' : '#92400e' }}>
                             {u.role.toUpperCase()}
                           </span>
+                          <div style={{ color: '#475569', fontSize: '0.85rem' }}>
+                            {u.role === 'admin' ? <em style={{ color: '#94a3b8' }}>All Stores</em> : (u.store?.name || `Store ID: ${u.store_id}`)}
+                          </div>
                         </td>
-                        <td style={{ padding: '12px 20px', color: '#475569', fontSize: '0.9rem' }}>
-                          {u.role === 'admin' ? <em style={{ color: '#94a3b8' }}>All Stores</em> : (u.store?.name || `Store ID: ${u.store_id}`)}
+                        <td style={{ padding: '12px 20px', color: '#475569', fontSize: '0.8rem' }}>
+                          {u.role === 'admin' ? (
+                            <span style={{ color: '#10b981', fontWeight: 'bold' }}>All Pages Allowed</span>
+                          ) : (
+                            <ul style={{ margin: 0, paddingLeft: '15px', color: '#64748b' }}>
+                              {u.visible_pages && u.visible_pages.length > 0 ? (
+                                u.visible_pages.map((pId, idx) => (
+                                  <li key={idx}>{AVAILABLE_PAGES.find(p => p.id === pId)?.label || pId}</li>
+                                ))
+                              ) : (
+                                <li style={{ color: '#ef4444' }}>No Access</li>
+                              )}
+                            </ul>
+                          )}
                         </td>
                         <td style={{ padding: '12px 20px', textAlign: 'center' }}>
                           <button onClick={() => handleDeleteUser(u.id)} disabled={isSaving} style={{ padding: '6px 12px', background: isSaving ? '#f1f5f9' : '#fee2e2', color: isSaving ? '#94a3b8' : '#b91c1c', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
@@ -265,15 +304,9 @@ export default function UserManagementPage() {
             <span>Branch List</span>
           </h3>
           
-          {/* Tambah Cabang Baru */}
           <form onSubmit={handleCreateStore} style={{ display: 'flex', gap: '10px', padding: '15px 20px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
             <input 
-              type="text" 
-              placeholder="New branch name..." 
-              value={newStoreName} 
-              onChange={(e) => setNewStoreName(e.target.value)} 
-              disabled={isSaving}
-              required 
+              type="text" placeholder="New branch name..." value={newStoreName} onChange={(e) => setNewStoreName(e.target.value)} disabled={isSaving} required 
               style={{ flex: 1, padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} 
             />
             <button type="submit" disabled={isSaving} style={{ padding: '8px 15px', background: isSaving ? '#94a3b8' : '#10b981', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
@@ -287,7 +320,6 @@ export default function UserManagementPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ backgroundColor: '#fff', color: '#475569', fontSize: '0.85rem' }}>
-                  {/* UBAH HEADER ID MENJADI NO. */}
                   <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', width: '50px', textAlign: 'center' }}>No.</th>
                   <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Branch Name</th>
                   <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', textAlign: 'center', width: '120px' }}>Actions</th>
@@ -299,24 +331,12 @@ export default function UserManagementPage() {
                     <td colSpan="3" style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>No branches found.</td>
                   </tr>
                 ) : (
-                  // TAMBAHKAN PARAMETER index DI SINI
                   stores.map((store, index) => (
                     <tr key={store.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      {/* GUNAKAN index + 1 UNTUK NOMOR URUT */}
-                      <td style={{ padding: '12px 20px', color: '#64748b', fontWeight: 'bold', textAlign: 'center' }}>
-                        {index + 1}
-                      </td>
+                      <td style={{ padding: '12px 20px', color: '#64748b', fontWeight: 'bold', textAlign: 'center' }}>{index + 1}</td>
                       <td style={{ padding: '12px 20px' }}>
-                        {/* Jika sedang diedit, tampilkan Input text */}
                         {editingStoreId === store.id ? (
-                          <input 
-                            type="text" 
-                            value={editStoreName} 
-                            onChange={(e) => setEditStoreName(e.target.value)} 
-                            disabled={isSaving}
-                            autoFocus
-                            style={{ width: '100%', padding: '6px', border: '1px solid #3b82f6', borderRadius: '4px' }} 
-                          />
+                          <input type="text" value={editStoreName} onChange={(e) => setEditStoreName(e.target.value)} disabled={isSaving} autoFocus style={{ width: '100%', padding: '6px', border: '1px solid #3b82f6', borderRadius: '4px' }} />
                         ) : (
                           <span style={{ fontWeight: 'bold', color: '#1e293b' }}>{store.name}</span>
                         )}

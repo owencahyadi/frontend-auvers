@@ -18,6 +18,9 @@ export default function Sidebar() {
   const user = userStr ? JSON.parse(userStr) : {};
   const isAdmin = user.role === 'admin';
   const isManager = user.role === 'manager';
+  
+  // Ambil data permissions (hak akses halaman) dari array visible_pages
+  const myPermissions = user.visible_pages || [];
 
   // Fetch store list from database (Only for Admin)
   useEffect(() => {
@@ -81,30 +84,58 @@ export default function Sidebar() {
         {/* --- FIXED BRANCH LABEL FOR MANAGER --- */}
         {isManager && (
           <div style={{ padding: '15px 20px', borderBottom: '1px solid #334155', marginBottom: '10px', color: '#cbd5e1', fontSize: '0.85rem' }}>
-            📍 <strong>Branch: {user.store_id ? `Store ${user.store_id}` : activeStoreId}</strong>
+            📍 <strong>Branch: {user.store?.name || `Store ${user.store_id}`}</strong>
           </div>
         )}
         
         <nav style={{ flexGrow: 1 }}>
-          {/* ADMIN ONLY MENUS */}
+          {/* MENU KHUSUS SUPER ADMIN */}
           {isAdmin && (
-            <>
-              <NavLink to="/users" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                👤 User Management
-              </NavLink>
-              <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                📊 Roster & Payroll
-              </NavLink>
-            </>
+            <NavLink to="/users" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              👤 User Management
+            </NavLink>
           )}
           
-          {/* SHARED MENUS (Admin & Manager) */}
-          <NavLink to="/calendar" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>📅 Schedule</NavLink>
-          <NavLink to="/employees" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>👥 Manage Employees</NavLink>
-          <NavLink to="/supplier" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>🍅 Supplier Catalogue</NavLink>
-          <NavLink to="/purchase" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>🛒 Purchases</NavLink>
-          <NavLink to="/operational-costs" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>⚡ Operational Costs</NavLink>
-          <NavLink to="/pl" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>📊 P&L</NavLink>
+          {/* MENU DENGAN GRANULAR PERMISSIONS */}
+          {(isAdmin || myPermissions.includes('roster_payroll')) && (
+            <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              📊 Roster & Payroll
+            </NavLink>
+          )}
+
+          <NavLink to="/calendar" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+            📅 Schedule
+          </NavLink>
+
+          {(isAdmin || myPermissions.includes('employees')) && (
+            <NavLink to="/employees" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              👥 Manage Employees
+            </NavLink>
+          )}
+
+          {(isAdmin || myPermissions.includes('suppliers')) && (
+            <NavLink to="/supplier" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              🍅 Supplier Catalogue
+            </NavLink>
+          )}
+
+          {(isAdmin || myPermissions.includes('purchases')) && (
+            <NavLink to="/purchase" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              🛒 Purchases
+            </NavLink>
+          )}
+
+          {(isAdmin || myPermissions.includes('operational_costs')) && (
+            <NavLink to="/operational-costs" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              ⚡ Operational Costs
+            </NavLink>
+          )}
+
+          {(isAdmin || myPermissions.includes('profit_loss')) && (
+            <NavLink to="/pl" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              📊 P&L
+            </NavLink>
+          )}
         </nav>
 
         <div style={{ padding: '20px' }}>
