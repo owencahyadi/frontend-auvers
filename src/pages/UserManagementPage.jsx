@@ -129,7 +129,16 @@ export default function UserManagementPage() {
       .then(res => {
         setFeedback({ type: 'success', text: res.data.message || 'Branch updated successfully!' });
         setEditingStoreId(null);
-        fetchData();
+        
+        // PENTING: Cek apakah cabang yang diedit adalah cabang yang sedang dibuka
+        const activeStoreId = localStorage.getItem('active_store_id');
+        if (String(id) === activeStoreId) {
+          // Refresh halaman secara otomatis agar tulisan di Sidebar ikut terupdate
+          window.location.reload();
+        } else {
+          // Jika yang diedit cabang lain, cukup refresh tabelnya saja
+          fetchData();
+        }
       })
       .catch(() => setFeedback({ type: 'error', text: 'Failed to update branch name.' }))
       .finally(() => setIsSaving(false));
@@ -278,7 +287,8 @@ export default function UserManagementPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ backgroundColor: '#fff', color: '#475569', fontSize: '0.85rem' }}>
-                  <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', width: '50px' }}>ID</th>
+                  {/* UBAH HEADER ID MENJADI NO. */}
+                  <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', width: '50px', textAlign: 'center' }}>No.</th>
                   <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Branch Name</th>
                   <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', textAlign: 'center', width: '120px' }}>Actions</th>
                 </tr>
@@ -289,9 +299,13 @@ export default function UserManagementPage() {
                     <td colSpan="3" style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>No branches found.</td>
                   </tr>
                 ) : (
-                  stores.map(store => (
+                  // TAMBAHKAN PARAMETER index DI SINI
+                  stores.map((store, index) => (
                     <tr key={store.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '12px 20px', color: '#64748b', fontWeight: 'bold' }}>#{store.id}</td>
+                      {/* GUNAKAN index + 1 UNTUK NOMOR URUT */}
+                      <td style={{ padding: '12px 20px', color: '#64748b', fontWeight: 'bold', textAlign: 'center' }}>
+                        {index + 1}
+                      </td>
                       <td style={{ padding: '12px 20px' }}>
                         {/* Jika sedang diedit, tampilkan Input text */}
                         {editingStoreId === store.id ? (
