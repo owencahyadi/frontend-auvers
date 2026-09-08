@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
 
-// Daftar semua halaman yang tersedia di sistem Anda
 const AVAILABLE_PAGES = [
   { id: 'profit_loss', label: '📊 View Profit & Loss (P&L)' },
   { id: 'employees', label: '👥 View Employee Master Data' },
@@ -23,10 +22,12 @@ export default function UserManagementPage() {
   const [feedback, setFeedback] = useState({ type: '', text: '' });
   const [isSaving, setIsSaving] = useState(false);
 
-  // State form ditambahkan 'visible_pages'
+  // STATE BARU: Untuk mode Edit User
+  const [editingUserId, setEditingUserId] = useState(null);
+
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', role: 'manager', store_id: '',
-    visible_pages: [] // Array kosong secara default
+    visible_pages: [] 
   });
 
   const [newStoreName, setNewStoreName] = useState('');
@@ -59,25 +60,48 @@ export default function UserManagementPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Fungsi khusus untuk menangani centang hak akses halaman
   const handleCheckboxChange = (pageId) => {
     setFormData(prev => {
       const currentPages = prev.visible_pages || [];
       if (currentPages.includes(pageId)) {
-        return { ...prev, visible_pages: currentPages.filter(id => id !== pageId) }; // Uncheck
+        return { ...prev, visible_pages: currentPages.filter(id => id !== pageId) }; 
       } else {
-        return { ...prev, visible_pages: [...currentPages, pageId] }; // Check
+        return { ...prev, visible_pages: [...currentPages, pageId] }; 
       }
     });
   };
 
-  const handleCreateUser = (e) => {
+  // FUNGSI BARU: Saat tombol Edit ditekan
+  const handleEditUserClick = (user) => {
+    setEditingUserId(user.id);
+    setFormData({
+      name: user.name,
+      email: user.email,
+      password: '', // Sengaja dikosongkan, diisi hanya jika ingin ganti password
+      role: user.role,
+      store_id: user.store_id || '',
+      visible_pages: user.visible_pages || []
+    });
+    setFeedback({ type: '', text: '' });
+    // Scroll otomatis ke atas (ke arah form)
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // FUNGSI BARU: Batal Edit
+  const handleCancelEditUser = () => {
+    setEditingUserId(null);
+    setFormData({ name: '', email: '', password: '', role: 'manager', store_id: '', visible_pages: [] });
+    setFeedback({ type: '', text: '' });
+  };
+
+  // Fungsi Submit diubah agar bisa menangani Create dan Update
+  const handleSubmitUser = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
 
     if (formData.role === 'manager') {
       if (!formData.store_id) {
-        setFeedback({ type: 'error', text: 'Please assign a store for the manager.' });
+        setFeedback({ type: 'error', text: 'Please assign a branch for the manager.' });
         return;
       }
       if (formData.visible_pages.length === 0) {
@@ -87,14 +111,20 @@ export default function UserManagementPage() {
     }
 
     setIsSaving(true);
-    api.post('/users', formData)
+
+    const apiCall = editingUserId 
+      ? api.put(`/users/${editingUserId}`, formData) // Jika mode Edit
+      : api.post('/users', formData);                // Jika mode Create
+
+    apiCall
       .then(res => {
         setFeedback({ type: 'success', text: res.data.message });
+        setEditingUserId(null);
         setFormData({ name: '', email: '', password: '', role: 'manager', store_id: '', visible_pages: [] });
         fetchData();
       })
       .catch(err => {
-        const errorMsg = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Failed to create user.';
+        const errorMsg = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Failed to process user data.';
         setFeedback({ type: 'error', text: errorMsg });
       })
       .finally(() => setIsSaving(false));
@@ -102,21 +132,18 @@ export default function UserManagementPage() {
 
   const handleDeleteUser = (id) => {
     if (!window.confirm('Are you sure you want to delete this user account?')) return;
-    
     setIsSaving(true);
     api.delete(`/users/${id}`)
       .then(res => {
         setFeedback({ type: 'success', text: res.data.message });
         fetchData();
       })
-      .catch(err => {
-        setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to delete user.' });
-      })
+      .catch(err => setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to delete user.' }))
       .finally(() => setIsSaving(false));
   };
 
   // ----------------------------------------------------
-  // STORE HANDLERS (Sama seperti sebelumnya)
+  // STORE HANDLERS
   // ----------------------------------------------------
   const handleCreateStore = (e) => {
     e.preventDefault();
@@ -143,7 +170,7 @@ export default function UserManagementPage() {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1 style={{ marginBottom: '25px', color: '#0f172a' }}>👤 User & Branch Management</h1>
+      <h1 style={{ marginBottom: '10px', color: '#0f172a' }}>👤 User & Branch Management</h1>
       <p style={{ color: '#64748b', marginBottom: '25px' }}>
         Create and manage administrative accounts and restaurant branches.
       </p>
@@ -154,11 +181,20 @@ export default function UserManagementPage() {
         </div>
       )}
 
-      {/* CREATE USER FORM CONTAINER */}
-      <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '30px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-        <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#1e293b' }}>+ Add New User Account</h3>
+      {/* CREATE / EDIT USER FORM CONTAINER */}
+      <div style={{ background: editingUserId ? '#fffbeb' : '#fff', padding: '25px', borderRadius: '8px', border: `1px solid ${editingUserId ? '#fcd34d' : '#e2e8f0'}`, marginBottom: '30px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', transition: 'all 0.3s ease' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, color: editingUserId ? '#d97706' : '#1e293b' }}>
+            {editingUserId ? '✎ Edit User Account & Permissions' : '+ Add New User Account'}
+          </h3>
+          {editingUserId && (
+            <button onClick={handleCancelEditUser} disabled={isSaving} style={{ padding: '6px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              ✖ Cancel Edit
+            </button>
+          )}
+        </div>
         
-        <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', alignItems: 'flex-start' }}>
+        <form onSubmit={handleSubmitUser} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', alignItems: 'flex-start' }}>
           <div>
             <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Full Name</label>
             <input type="text" name="name" value={formData.name} onChange={handleInputChange} disabled={isSaving} required placeholder="John Doe" style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
@@ -171,7 +207,16 @@ export default function UserManagementPage() {
 
           <div>
             <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Password</label>
-            <input type="password" name="password" value={formData.password} onChange={handleInputChange} disabled={isSaving} required placeholder="Min. 6 characters" style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
+            <input 
+              type="password" 
+              name="password" 
+              value={formData.password} 
+              onChange={handleInputChange} 
+              disabled={isSaving} 
+              required={!editingUserId} // Required hanya saat buat baru, saat edit boleh kosong
+              placeholder={editingUserId ? "Leave blank to keep current" : "Min. 6 characters"} 
+              style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} 
+            />
           </div>
 
           <div>
@@ -184,7 +229,7 @@ export default function UserManagementPage() {
 
           {/* KOTAK AKSES KHUSUS MANAGER */}
           {formData.role === 'manager' && (
-            <div style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+            <div style={{ gridColumn: '1 / -1', background: editingUserId ? '#fff' : '#f8fafc', padding: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
                 
                 {/* Pilih Toko */}
@@ -222,8 +267,8 @@ export default function UserManagementPage() {
           )}
 
           <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-            <button type="submit" disabled={isSaving} style={{ padding: '12px 30px', background: isSaving ? '#94a3b8' : '#2563eb', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
-              {isSaving ? 'Creating...' : 'Create Account'}
+            <button type="submit" disabled={isSaving} style={{ padding: '12px 30px', background: isSaving ? '#94a3b8' : (editingUserId ? '#f59e0b' : '#2563eb'), color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+              {isSaving ? 'Processing...' : (editingUserId ? 'Update Account' : 'Create Account')}
             </button>
           </div>
         </form>
@@ -256,7 +301,7 @@ export default function UserManagementPage() {
                     </tr>
                   ) : (
                     users.map(u => (
-                      <tr key={u.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <tr key={u.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: editingUserId === u.id ? '#fffbeb' : '#fff' }}>
                         <td style={{ padding: '12px 20px' }}>
                           <div style={{ fontWeight: 'bold', color: '#1e293b' }}>{u.name}</div>
                           <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{u.email}</div>
@@ -285,9 +330,22 @@ export default function UserManagementPage() {
                           )}
                         </td>
                         <td style={{ padding: '12px 20px', textAlign: 'center' }}>
-                          <button onClick={() => handleDeleteUser(u.id)} disabled={isSaving} style={{ padding: '6px 12px', background: isSaving ? '#f1f5f9' : '#fee2e2', color: isSaving ? '#94a3b8' : '#b91c1c', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
-                            Delete
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button 
+                              onClick={() => handleEditUserClick(u)} 
+                              disabled={isSaving} 
+                              style={{ padding: '6px 12px', background: isSaving ? '#f1f5f9' : '#fef3c7', color: isSaving ? '#94a3b8' : '#d97706', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteUser(u.id)} 
+                              disabled={isSaving} 
+                              style={{ padding: '6px 12px', background: isSaving ? '#f1f5f9' : '#fee2e2', color: isSaving ? '#94a3b8' : '#b91c1c', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
