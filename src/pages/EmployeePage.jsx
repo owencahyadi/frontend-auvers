@@ -6,11 +6,12 @@ export default function EmployeePage() {
   const [loading, setLoading] = useState(true);
   
   // STATE MODAL & NOTIFICATION
-  const [activeModal, setActiveModal] = useState(null); // 'edit' or null
+  const [activeModal, setActiveModal] = useState(null); // 'edit', 'delete', or null
   const [feedback, setFeedback] = useState({ type: '', text: '' });
   
-  // STATE EDIT FORM
+  // STATE FORMS & SELECTION
   const [editData, setEditData] = useState({ id: '', name: '', position: '' });
+  const [employeeToDelete, setEmployeeToDelete] = useState(null); // Menyimpan data karyawan yang akan dihapus
 
   const fetchEmployees = () => {
     setLoading(true);
@@ -27,24 +28,41 @@ export default function EmployeePage() {
     fetchEmployees();
   }, []);
 
-  // DELETE HANDLER
-  const handleDelete = (id, name) => {
-    if (window.confirm(`⚠️ WARNING: Are you sure you want to delete "${name}"?\n\nAll shift schedules and wage history in the database will be permanently deleted!`)) {
-      api.delete(`/employees/${id}`).then(() => {
-        setFeedback({ type: 'success', text: `Employee ${name} successfully deleted!` });
-        fetchEmployees();
-      }).catch(() => setFeedback({ type: 'error', text: 'Failed to delete employee.' }));
-    }
+  // ----------------------------------------------------
+  // DELETE HANDLERS
+  // ----------------------------------------------------
+  // 1. Fungsi untuk membuka modal konfirmasi delete
+  const handleDeleteClick = (emp) => {
+    setEmployeeToDelete(emp);
+    setFeedback({ type: '', text: '' });
+    setActiveModal('delete');
   };
 
-  // OPEN EDIT MODAL HANDLER
+  // 2. Fungsi untuk mengeksekusi proses delete ke API
+  const confirmDelete = () => {
+    if (!employeeToDelete) return;
+    
+    api.delete(`/employees/${employeeToDelete.id}`).then(() => {
+      setFeedback({ type: 'success', text: `Employee ${employeeToDelete.name} successfully deleted!` });
+      fetchEmployees();
+      setActiveModal(null);
+      setEmployeeToDelete(null);
+    }).catch(() => {
+      setFeedback({ type: 'error', text: 'Failed to delete employee.' });
+      setActiveModal(null);
+      setEmployeeToDelete(null);
+    });
+  };
+
+  // ----------------------------------------------------
+  // EDIT HANDLERS
+  // ----------------------------------------------------
   const handleEditClick = (emp) => {
     setEditData({ id: emp.id, name: emp.name, position: emp.position });
     setFeedback({ type: '', text: '' });
     setActiveModal('edit');
   };
 
-  // SAVE EDIT (UPDATE) HANDLER
   const handleUpdateSubmit = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
@@ -119,7 +137,7 @@ export default function EmployeePage() {
                           ✎ Edit
                         </button>
                         <button 
-                          onClick={() => handleDelete(emp.id, emp.name)}
+                          onClick={() => handleDeleteClick(emp)}
                           style={{ padding: '6px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>
                           ✖ Delete
                         </button>
@@ -164,6 +182,46 @@ export default function EmployeePage() {
                 Save Changes
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {activeModal === 'delete' && employeeToDelete && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px'
+        }}>
+          <div style={{
+            background: '#fff', padding: '25px', borderRadius: '10px',
+            width: '100%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', position: 'relative'
+          }}>
+            <button onClick={() => { setActiveModal(null); setEmployeeToDelete(null); }} style={{
+              position: 'absolute', top: '15px', right: '15px',
+              background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#666'
+            }}>✖</button>
+
+            <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#ef4444' }}>⚠️ Confirm Deletion</h3>
+            
+            <p style={{ marginBottom: '25px', color: '#334155', lineHeight: '1.5', fontSize: '0.95rem' }}>
+              Are you sure you want to delete <strong>"{employeeToDelete.name}"</strong>?
+              <br /><br />
+              All shift schedules and wage history in the database will be permanently deleted and cannot be recovered!
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => { setActiveModal(null); setEmployeeToDelete(null); }} 
+                style={{ padding: '10px 15px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete} 
+                style={{ padding: '10px 15px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Yes, Delete!
+              </button>
+            </div>
           </div>
         </div>
       )}
