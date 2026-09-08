@@ -5,8 +5,9 @@ const AVAILABLE_PAGES = [
   { id: 'profit_loss', label: '📊 View Profit & Loss (P&L)' },
   { id: 'employees', label: '👥 View Employee Master Data' },
   { id: 'suppliers', label: '📦 View Supplier Catalogue' },
-  { id: 'purchases', label: '🛒 View Purchases / COGS' },
-  { id: 'operational_costs', label: '⚡ View Operational Costs' },
+  { id: 'purchases', label: '🛒 Purchases / COGS' },
+  { id: 'operational_costs', label: '⚡ Operational Costs' },
+  { id: 'calendar', label: '📅 View Schedule' },
   
   // -- GRUP PAYROLL & ROSTER --
   { id: 'roster_payroll', label: '📅 VIEW: Roster & Payroll Page' },
@@ -73,12 +74,18 @@ export default function UserManagementPage() {
   const handleEditUserClick = (user) => {
     setEditingUserId(user.id);
     
-    // Konversi aman agar JSON dari database pasti berubah menjadi Array untuk Checkbox
+    // PERBAIKAN UTAMA: Parsing data visible_pages dengan aman (baik format string JSON maupun array)
     let parsedPages = [];
-    if (typeof user.visible_pages === 'string') {
-      try { parsedPages = JSON.parse(user.visible_pages); } catch(e) { parsedPages = []; }
-    } else if (Array.isArray(user.visible_pages)) {
-      parsedPages = user.visible_pages;
+    if (user.visible_pages) {
+      if (typeof user.visible_pages === 'string') {
+        try { 
+          parsedPages = JSON.parse(user.visible_pages); 
+        } catch(e) { 
+          parsedPages = []; 
+        }
+      } else if (Array.isArray(user.visible_pages)) {
+        parsedPages = user.visible_pages;
+      }
     }
 
     setFormData({
@@ -177,7 +184,6 @@ export default function UserManagementPage() {
     }).finally(() => setIsSaving(false));
   };
 
-  // FUNGSI BARU: Delete Store
   const handleDeleteStore = (id) => {
     if (!window.confirm('⚠️ WARNING: Are you sure you want to delete this branch? All users and data tied to this branch might be affected!')) return;
     
@@ -338,16 +344,18 @@ export default function UserManagementPage() {
                           </div>
                         </td>
                         <td style={{ padding: '12px 20px', color: '#475569', fontSize: '0.85rem' }}>
-                          {/* LOGIKA TAMPILAN LIMITED ACCESS */}
+                          {/* LOGIKA TAMPILAN PAGE ACCESS RINGKAS */}
                           {u.role === 'admin' ? (
                             <span style={{ color: '#10b981', fontWeight: 'bold' }}>All Pages Allowed</span>
                           ) : (
                             (() => {
                               let pages = [];
-                              if (typeof u.visible_pages === 'string') {
-                                try { pages = JSON.parse(u.visible_pages); } catch(e) {}
-                              } else if (Array.isArray(u.visible_pages)) {
-                                pages = u.visible_pages;
+                              if (u.visible_pages) {
+                                if (typeof u.visible_pages === 'string') {
+                                  try { pages = JSON.parse(u.visible_pages); } catch(e) {}
+                                } else if (Array.isArray(u.visible_pages)) {
+                                  pages = u.visible_pages;
+                                }
                               }
 
                               if (pages.length === 0) {
@@ -362,7 +370,7 @@ export default function UserManagementPage() {
                                 <div>
                                   <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>Limited Access</span>
                                   <div style={{ fontSize: '0.75rem', marginTop: '4px', color: '#64748b' }}>
-                                    {pages.length} features enabled
+                                    ({pages.length} features enabled)
                                   </div>
                                 </div>
                               );
@@ -450,7 +458,6 @@ export default function UserManagementPage() {
                             <button onClick={() => handleEditStoreClick(store)} disabled={isSaving} style={{ padding: '6px 12px', background: isSaving ? '#e2e8f0' : '#f59e0b', color: isSaving ? '#94a3b8' : '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
                               Edit
                             </button>
-                            {/* TOMBOL DELETE STORE */}
                             <button onClick={() => handleDeleteStore(store.id)} disabled={isSaving} style={{ padding: '6px 12px', background: isSaving ? '#f1f5f9' : '#fee2e2', color: isSaving ? '#94a3b8' : '#b91c1c', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
                               Delete
                             </button>
