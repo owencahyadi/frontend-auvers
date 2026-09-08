@@ -1,3 +1,4 @@
+import { useState, useEffect, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import LoginPage from './pages/LoginPage'; 
@@ -8,15 +9,15 @@ import SupplierPage from './pages/SupplierPage';
 import PurchasePage from './pages/PurchasePage';
 import ProfitLossPage from './pages/ProfitLossPage';
 import OperationalCostPage from './pages/OperationalCostPage';
-import UserManagementPage from './pages/UserManagementPage'; // <--- IMPORT HALAMAN USER MANAGEMENT
+import UserManagementPage from './pages/UserManagementPage'; 
 
 // IMPORT STORE PROVIDER DARI CONTEXT
 import { StoreProvider } from './context/StoreContext'; 
 
 import './App.css';
 
-// 1. KOMPONEN PROTECTED ROUTE DENGAN ROLE CHECKER
-const ProtectedRoute = ({ allowedRoles }) => {
+// 1. KOMPONEN PROTECTED ROUTE YANG MENDUKUNG GRANULAR PERMISSIONS
+const ProtectedRoute = ({ allowedRoles, requiredPermission }) => {
   const userStr = localStorage.getItem('user');
   if (!userStr) {
     return <Navigate to="/login" replace />;
@@ -24,9 +25,18 @@ const ProtectedRoute = ({ allowedRoles }) => {
 
   const user = JSON.parse(userStr);
 
-  // Jika rute dibatasi oleh role tertentu dan user tidak punya akses, tendang ke /calendar
+  // Jika halaman dibatasi khusus admin (seperti User Management) dan user bukan admin -> tendang
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/calendar" replace />;
+  }
+
+  // Jika halaman butuh izin spesifik (misal: 'roster_payroll' atau 'profit_loss')
+  if (requiredPermission && user.role !== 'admin') {
+    const permissions = user.visible_pages || [];
+    // Jika manager tidak punya izin ke halaman tersebut -> tendang ke /calendar
+    if (!permissions.includes(requiredPermission)) {
+      return <Navigate to="/calendar" replace />;
+    }
   }
 
   return <Outlet />;
@@ -63,19 +73,38 @@ function App() {
           {/* PROTECTED ROUTES: Harus Login & Menggunakan Sidebar */}
           <Route element={<DashboardLayout />}>
             
-            {/* ADMIN ONLY ROUTES (Payroll & User Management) */}
+            {/* USER MANAGEMENT: Hanya untuk Admin */}
             <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-              <Route path="/" element={<PayrollPage />} />
               <Route path="/users" element={<UserManagementPage />} />
             </Route>
 
-            {/* SHARED ROUTES (Admin & Manager) */}
+            {/* PAYROLL / ROSTER: Admin atau Manager yang memiliki izin 'roster_payroll' */}
+            <Route element={<ProtectedRoute requiredPermission="roster_payroll" />}>
+              <Route path="/" element={<PayrollPage />} />
+            </Route>
+
+            {/* SHARED / PERMISSION-BASED ROUTES (Admin & Manager dengan izin masing-masing) */}
             <Route element={<ProtectedRoute allowedRoles={['admin', 'manager']} />}>
               <Route path="/calendar" element={<CalendarPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute requiredPermission="employees" />}>
               <Route path="/employees" element={<EmployeePage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute requiredPermission="suppliers" />}>
               <Route path="/supplier" element={<SupplierPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute requiredPermission="purchases" />}>
               <Route path="/purchase" element={<PurchasePage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute requiredPermission="profit_loss" />}>
               <Route path="/pl" element={<ProfitLossPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute requiredPermission="operational_costs" />}>
               <Route path="/operational-costs" element={<OperationalCostPage />} />
             </Route>
 
