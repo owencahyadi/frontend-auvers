@@ -200,7 +200,7 @@ export default function UserManagementPage() {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1 style={{ marginBottom: '10px', color: '#0f172a' }}>👤 User & Branch Management</h1>
+      <h1 style={{ marginBottom: '30px', color: '#0f172a' }}>👤 User & Branch Management</h1>
       <p style={{ color: '#64748b', marginBottom: '25px' }}>
         Create and manage administrative accounts and restaurant branches.
       </p>
