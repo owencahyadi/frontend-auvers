@@ -1,368 +1,478 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { StoreContext } from '../context/StoreContext';
 
-export default function OperationalNotesPage() {
-  const { activeStoreId } = useContext(StoreContext);
-  const [notes, setNotes] = useState([]);
+const AVAILABLE_PAGES = [
+  { id: 'profit_loss', label: '📊 View Profit & Loss (P&L)' },
+  { id: 'employees', label: '👥 View Employee Master Data' },
+  { id: 'suppliers', label: '📦 View Supplier Catalogue' },
+  { id: 'purchases', label: '🛒 Purchases / COGS' },
+  { id: 'operational_costs', label: '⚡ Operational Costs' },
+  { id: 'calendar', label: '📅 View Schedule' },
+  { id: 'operational_notes', label: '📋 View Operational Notes' },
+  
+  // -- GRUP PAYROLL & ROSTER --
+  { id: 'roster_payroll', label: '📅 VIEW: Roster & Payroll Page' },
+  { id: 'act_add_staff', label: 'ㅤ ↳ ACTION: Add New Employee' },
+  { id: 'act_edit_rate', label: 'ㅤ ↳ ACTION: Update Staff Rates' },
+  { id: 'act_input_shift', label: 'ㅤ ↳ ACTION: Input Shift Roster' },
+];
+
+export default function UserManagementPage() {
+  const [users, setUsers] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [search, setSearch] = useState('');
-
-  const [activeModal, setActiveModal] = useState(null); // 'add', 'edit', null
-  const [editingId, setEditingId] = useState(null);
-  const [noteToDelete, setNoteToDelete] = useState(null);
   const [feedback, setFeedback] = useState({ type: '', text: '' });
+  const [isSaving, setIsSaving] = useState(false);
 
-  const initialForm = {
-    item: '',
-    username: '',
-    password: '',
-    cut_off_time: '',
-    delivery_day: '',
-    minimum_order: '',
-    contact: '',
-    phone: '',
-    noted: ''
-  };
+  const [editingUserId, setEditingUserId] = useState(null);
 
-  const [formData, setFormData] = useState(initialForm);
+  const [formData, setFormData] = useState({
+    name: '', email: '', password: '', role: 'manager', store_id: '',
+    visible_pages: [] 
+  });
 
-  const fetchNotes = () => {
+  const [newStoreName, setNewStoreName] = useState('');
+  const [editingStoreId, setEditingStoreId] = useState(null);
+  const [editStoreName, setEditStoreName] = useState('');
+
+  const fetchData = async () => {
     setLoading(true);
-    const storeParam = activeStoreId ? `?store_id=${activeStoreId}` : '';
-    api.get(`/operational-notes${storeParam}`)
-      .then(res => {
-        setNotes(res.data.data || []);
-        setLoading(false);
-      })
-      .catch(() => {
-        setFeedback({ type: 'error', text: 'Failed to load operational notes.' });
-        setLoading(false);
-      });
+    try {
+      const [usersRes, storesRes] = await Promise.all([
+        api.get('/users'),
+        api.get('/stores')
+      ]);
+      setUsers(usersRes.data.data || []);
+      setStores(storesRes.data.data || []);
+    } catch (err) {
+      setFeedback({ type: 'error', text: 'Failed to load user management data.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => {
-    fetchNotes();
-  }, [activeStoreId]);
+  useEffect(() => { fetchData(); }, []);
 
-  const handleOpenAdd = () => {
-    setFormData(initialForm);
-    setEditingId(null);
-    setFeedback({ type: '', text: '' });
-    setActiveModal('add');
+  // ----------------------------------------------------
+  // USER HANDLERS
+  // ----------------------------------------------------
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleOpenEdit = (note) => {
-    setFormData({
-      item: note.item || '',
-      username: note.username || '',
-      password: note.password || '',
-      cut_off_time: note.cut_off_time || '',
-      delivery_day: note.delivery_day || '',
-      minimum_order: note.minimum_order || '',
-      contact: note.contact || '',
-      phone: note.phone || '',
-      noted: note.noted || ''
+  const handleCheckboxChange = (pageId) => {
+    setFormData(prev => {
+      const currentPages = prev.visible_pages || [];
+      if (currentPages.includes(pageId)) {
+        return { ...prev, visible_pages: currentPages.filter(id => id !== pageId) }; 
+      } else {
+        return { ...prev, visible_pages: [...currentPages, pageId] }; 
+      }
     });
-    setEditingId(note.id);
-    setFeedback({ type: '', text: '' });
-    setActiveModal('edit');
   };
 
-  const handleSubmit = (e) => {
+  const handleEditUserClick = (user) => {
+    setEditingUserId(user.id);
+    
+    // PERBAIKAN UTAMA: Parsing data visible_pages dengan aman (baik format string JSON maupun array)
+    let parsedPages = [];
+    if (user.visible_pages) {
+      if (typeof user.visible_pages === 'string') {
+        try { 
+          parsedPages = JSON.parse(user.visible_pages); 
+        } catch(e) { 
+          parsedPages = []; 
+        }
+      } else if (Array.isArray(user.visible_pages)) {
+        parsedPages = user.visible_pages;
+      }
+    }
+
+    setFormData({
+      name: user.name,
+      email: user.email,
+      password: '', 
+      role: user.role,
+      store_id: user.store_id || '',
+      visible_pages: parsedPages
+    });
+    setFeedback({ type: '', text: '' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEditUser = () => {
+    setEditingUserId(null);
+    setFormData({ name: '', email: '', password: '', role: 'manager', store_id: '', visible_pages: [] });
+    setFeedback({ type: '', text: '' });
+  };
+
+  const handleSubmitUser = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
+
+    if (formData.role === 'manager') {
+      if (!formData.store_id) {
+        setFeedback({ type: 'error', text: 'Please assign a branch for the manager.' });
+        return;
+      }
+      if (formData.visible_pages.length === 0) {
+        setFeedback({ type: 'error', text: 'Please select at least one page for the manager to access.' });
+        return;
+      }
+    }
+
     setIsSaving(true);
 
-    const payload = {
-      ...formData,
-      store_id: activeStoreId || null
-    };
+    const apiCall = editingUserId 
+      ? api.put(`/users/${editingUserId}`, formData) 
+      : api.post('/users', formData);                
 
-    const request = editingId 
-      ? api.put(`/operational-notes/${editingId}`, payload)
-      : api.post('/operational-notes', payload);
-
-    request.then(res => {
-      setFeedback({ type: 'success', text: res.data.message });
-      fetchNotes();
-      setTimeout(() => setActiveModal(null), 800);
-    }).catch(err => {
-      setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to save note.' });
-    }).finally(() => setIsSaving(false));
-  };
-
-  const confirmDelete = () => {
-    if (!noteToDelete) return;
-    setIsSaving(true);
-
-    api.delete(`/operational-notes/${noteToDelete.id}`)
-      .then(() => {
-        fetchNotes();
-        setNoteToDelete(null);
+    apiCall
+      .then(res => {
+        setFeedback({ type: 'success', text: res.data.message });
+        setEditingUserId(null);
+        setFormData({ name: '', email: '', password: '', role: 'manager', store_id: '', visible_pages: [] });
+        fetchData();
       })
-      .catch(() => {
-        alert('Failed to delete note.');
+      .catch(err => {
+        const errorMsg = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Failed to process user data.';
+        setFeedback({ type: 'error', text: errorMsg });
       })
       .finally(() => setIsSaving(false));
   };
 
-  const filteredNotes = notes.filter(n => 
-    n.item.toLowerCase().includes(search.toLowerCase()) ||
-    (n.contact && n.contact.toLowerCase().includes(search.toLowerCase())) ||
-    (n.noted && n.noted.toLowerCase().includes(search.toLowerCase()))
-  );
+  const handleDeleteUser = (id) => {
+    if (!window.confirm('Are you sure you want to delete this user account?')) return;
+    setIsSaving(true);
+    api.delete(`/users/${id}`)
+      .then(res => {
+        setFeedback({ type: 'success', text: res.data.message });
+        fetchData();
+      })
+      .catch(err => setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to delete user.' }))
+      .finally(() => setIsSaving(false));
+  };
+
+  // ----------------------------------------------------
+  // STORE HANDLERS
+  // ----------------------------------------------------
+  const handleCreateStore = (e) => {
+    e.preventDefault();
+    if (!newStoreName.trim()) return;
+    setIsSaving(true);
+    api.post('/stores', { name: newStoreName }).then(() => {
+      setNewStoreName(''); fetchData();
+    }).finally(() => setIsSaving(false));
+  };
+
+  const handleEditStoreClick = (store) => {
+    setEditingStoreId(store.id); setEditStoreName(store.name);
+  };
+
+  const handleCancelEditStore = () => {
+    setEditingStoreId(null);
+    setEditStoreName('');
+  };
+
+  const handleSaveEditStore = (id) => {
+    if (!editStoreName.trim()) return;
+    setIsSaving(true);
+    api.put(`/stores/${id}`, { name: editStoreName }).then(() => {
+      setEditingStoreId(null);
+      if (String(id) === localStorage.getItem('active_store_id')) window.location.reload();
+      else fetchData();
+    }).finally(() => setIsSaving(false));
+  };
+
+  const handleDeleteStore = (id) => {
+    if (!window.confirm('⚠️ WARNING: Are you sure you want to delete this branch? All users and data tied to this branch might be affected!')) return;
+    
+    setIsSaving(true);
+    api.delete(`/stores/${id}`)
+      .then(res => {
+        setFeedback({ type: 'success', text: res.data.message || 'Branch deleted successfully.' });
+        fetchData();
+      })
+      .catch(err => setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to delete branch.' }))
+      .finally(() => setIsSaving(false));
+  };
 
   return (
-    <div>
-      {/* JUDUL HALAMAN */}
-      <div style={{ marginBottom: '25px' }}>
-        <h1 style={{ marginBottom: '25px', color: '#0f172a' }}>📋 Operational Notes & Vendor Info</h1>
-        <p style={{ margin: '5px 0 0 0', color: '#64748b', fontSize: '0.95rem' }}>
-          Store logins, cut-off schedules, vendor order contacts, and delivery terms.
-        </p>
-      </div>
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <h1 style={{ marginBottom: '10px', color: '#0f172a' }}>👤 User & Branch Management</h1>
+      <p style={{ color: '#64748b', marginBottom: '25px' }}>
+        Create and manage administrative accounts and restaurant branches.
+      </p>
 
       {feedback.text && (
-        <div style={{ padding: '10px 15px', marginBottom: '15px', borderRadius: '6px', fontWeight: 'bold', backgroundColor: feedback.type === 'success' ? '#e8f5e9' : '#ffebee', color: feedback.type === 'success' ? '#2e7d32' : '#c62828', border: `1px solid ${feedback.type === 'success' ? '#a5d6a7' : '#ef9a9a'}` }}>
+        <div style={{ padding: '12px 15px', marginBottom: '20px', borderRadius: '6px', fontWeight: 'bold', backgroundColor: feedback.type === 'success' ? '#e8f5e9' : '#ffebee', color: feedback.type === 'success' ? '#2e7d32' : '#c62828', border: `1px solid ${feedback.type === 'success' ? '#a5d6a7' : '#ef9a9a'}` }}>
           {feedback.text}
         </div>
       )}
 
-      {/* ACTION & SEARCH BAR (KIRI ATAS TABEL) */}
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px' }}>
-        <button 
-          onClick={handleOpenAdd}
-          disabled={loading || isSaving}
-          style={{ padding: '9px 16px', background: '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: (loading || isSaving) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
-        >
-          + Add New Entry
-        </button>
-        <input 
-          type="text" 
-          placeholder="Search vendor / item..." 
-          value={search} 
-          onChange={e => setSearch(e.target.value)} 
-          style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', width: '250px' }} 
-        />
-      </div>
-
-      {/* NOTES TABLE */}
-      <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', overflowX: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-        {loading ? (
-          <p style={{ padding: '25px', textAlign: 'center', color: '#64748b' }}>Loading operational notes...</p>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-            <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', color: '#1e293b' }}>
-              <tr>
-                <th style={{ padding: '12px 10px' }}>ITEM</th>
-                <th style={{ padding: '12px 10px' }}>USERNAME</th>
-                <th style={{ padding: '12px 10px' }}>PASSWORD</th>
-                <th style={{ padding: '12px 10px' }}>CUT OFF TIME</th>
-                <th style={{ padding: '12px 10px' }}>DELIVERY DAY</th>
-                <th style={{ padding: '12px 10px' }}>MINIMUM ORDER</th>
-                <th style={{ padding: '12px 10px' }}>CONTACT</th>
-                <th style={{ padding: '12px 10px' }}>PHONE</th>
-                <th style={{ padding: '12px 10px' }}>NOTED</th>
-                <th style={{ padding: '12px 10px', textAlign: 'center' }}>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredNotes.length === 0 ? (
-                <tr>
-                  <td colSpan="10" style={{ padding: '25px', textAlign: 'center', color: '#94a3b8' }}>
-                    No notes recorded yet. Click "+ Add New Entry" to get started.
-                  </td>
-                </tr>
-              ) : (
-                filteredNotes.map((note) => (
-                  <tr key={note.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '10px', fontWeight: 'bold', color: '#0f172a' }}>{note.item}</td>
-                    <td style={{ padding: '10px', color: '#2563eb' }}>{note.username || '-'}</td>
-                    <td style={{ padding: '10px', fontFamily: 'monospace', color: '#475569' }}>{note.password || '-'}</td>
-                    <td style={{ padding: '10px' }}>{note.cut_off_time || '-'}</td>
-                    <td style={{ padding: '10px' }}>{note.delivery_day || '-'}</td>
-                    <td style={{ padding: '10px', fontWeight: '500' }}>{note.minimum_order || '-'}</td>
-                    <td style={{ padding: '10px' }}>{note.contact || '-'}</td>
-                    <td style={{ padding: '10px', color: '#047857' }}>
-                      {note.phone ? <a href={`tel:${note.phone}`} style={{ textDecoration: 'none', color: 'inherit' }}>📞 {note.phone}</a> : '-'}
-                    </td>
-                    <td style={{ padding: '10px', color: '#475569', maxWidth: '200px', whiteSpace: 'normal' }}>
-                      {note.noted || '-'}
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'center' }}>
-                      <button 
-                        onClick={() => handleOpenEdit(note)} 
-                        disabled={isSaving}
-                        style={{ marginRight: '6px', padding: '4px 8px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => setNoteToDelete(note)} 
-                        disabled={isSaving}
-                        style={{ padding: '4px 8px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* MODAL INPUT / EDIT */}
-      {activeModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px', zIndex: 1000 }}>
-          <div style={{ background: '#fff', padding: '25px', borderRadius: '10px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
-            <button 
-              onClick={() => setActiveModal(null)} 
-              disabled={isSaving}
-              style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}
-            >
-              ✖
+      {/* CREATE / EDIT USER FORM CONTAINER */}
+      <div style={{ background: editingUserId ? '#fffbeb' : '#fff', padding: '25px', borderRadius: '8px', border: `1px solid ${editingUserId ? '#fcd34d' : '#e2e8f0'}`, marginBottom: '30px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', transition: 'all 0.3s ease' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, color: editingUserId ? '#d97706' : '#1e293b' }}>
+            {editingUserId ? '✎ Edit User Account & Permissions' : '+ Add New User Account'}
+          </h3>
+          {editingUserId && (
+            <button onClick={handleCancelEditUser} disabled={isSaving} style={{ padding: '6px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              ✖ Cancel Edit
             </button>
-            <h3 style={{ marginTop: 0, color: '#0d47a1', marginBottom: '15px' }}>
-              {activeModal === 'add' ? '+ Add Entry' : '✏️ Edit Entry'}
-            </h3>
-
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Item / Vendor Name *</label>
-                <input 
-                  type="text" required value={formData.item} 
-                  onChange={e => setFormData({...formData, item: e.target.value})} 
-                  placeholder="e.g., B & E, Wi-Fii, JFC"
-                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Username</label>
-                  <input 
-                    type="text" value={formData.username} 
-                    onChange={e => setFormData({...formData, username: e.target.value})} 
-                    placeholder="e.g., hello@ho-mee.com.au"
-                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Password</label>
-                  <input 
-                    type="text" value={formData.password} 
-                    onChange={e => setFormData({...formData, password: e.target.value})} 
-                    placeholder="e.g., homee123"
-                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Cut Off Time</label>
-                  <input 
-                    type="text" value={formData.cut_off_time} 
-                    onChange={e => setFormData({...formData, cut_off_time: e.target.value})} 
-                    placeholder="e.g., Before 6pm"
-                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Delivery Day</label>
-                  <input 
-                    type="text" value={formData.delivery_day} 
-                    onChange={e => setFormData({...formData, delivery_day: e.target.value})} 
-                    placeholder="e.g., Monday to Saturday"
-                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Minimum Order</label>
-                <input 
-                  type="text" value={formData.minimum_order} 
-                  onChange={e => setFormData({...formData, minimum_order: e.target.value})} 
-                  placeholder="e.g., $ 200,00 or No Minimum Order"
-                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Contact Person</label>
-                  <input 
-                    type="text" value={formData.contact} 
-                    onChange={e => setFormData({...formData, contact: e.target.value})} 
-                    placeholder="e.g., Kai, Catherine"
-                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Phone</label>
-                  <input 
-                    type="text" value={formData.phone} 
-                    onChange={e => setFormData({...formData, phone: e.target.value})} 
-                    placeholder="e.g., 61404202774"
-                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Noted (Ordering Method / Instructions)</label>
-                <textarea 
-                  rows="3" value={formData.noted} 
-                  onChange={e => setFormData({...formData, noted: e.target.value})} 
-                  placeholder="e.g., APP, Website, Whatsapp & Pickup in Rhodes"
-                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', resize: 'vertical' }}
-                />
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={isSaving}
-                style={{ marginTop: '10px', padding: '10px', background: isSaving ? '#94a3b8' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}
-              >
-                {isSaving ? 'Saving...' : 'Save Entry'}
-              </button>
-            </form>
-          </div>
+          )}
         </div>
-      )}
+        
+        <form onSubmit={handleSubmitUser} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', alignItems: 'flex-start' }}>
+          <div>
+            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Full Name</label>
+            <input type="text" name="name" value={formData.name} onChange={handleInputChange} disabled={isSaving} required placeholder="John Doe" style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
+          </div>
 
-      {/* MODAL KONFIRMASI DELETE */}
-      {noteToDelete && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ background: '#fff', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '350px', textAlign: 'center' }}>
-            <h3 style={{ margin: 0, color: '#0f172a' }}>Confirm Deletion</h3>
-            <p style={{ color: '#64748b', margin: '15px 0 20px 0' }}>
-              Delete entry for <strong>"{noteToDelete.item}"</strong>?
-            </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                onClick={() => setNoteToDelete(null)}
-                disabled={isSaving}
-                style={{ flex: 1, padding: '9px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmDelete}
-                disabled={isSaving}
-                style={{ flex: 1, padding: '9px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-              >
-                {isSaving ? 'Deleting...' : 'Yes, Delete'}
-              </button>
+          <div>
+            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Email</label>
+            <input type="email" name="email" value={formData.email} onChange={handleInputChange} disabled={isSaving} required placeholder="user@resto.com" style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Password</label>
+            <input 
+              type="password" 
+              name="password" 
+              value={formData.password} 
+              onChange={handleInputChange} 
+              disabled={isSaving} 
+              required={!editingUserId} 
+              placeholder={editingUserId ? "Leave blank to keep current" : "Min. 6 characters"} 
+              style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} 
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>Role</label>
+            <select name="role" value={formData.role} onChange={handleInputChange} disabled={isSaving} style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
+              <option value="manager">Branch Manager</option>
+              <option value="admin">Super Admin</option>
+            </select>
+          </div>
+
+          {/* KOTAK AKSES KHUSUS MANAGER */}
+          {formData.role === 'manager' && (
+            <div style={{ gridColumn: '1 / -1', background: editingUserId ? '#fff' : '#f8fafc', padding: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                
+                {/* Pilih Toko */}
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#0f172a', display: 'block', marginBottom: '10px' }}>1. Assign Branch</label>
+                  <select name="store_id" value={formData.store_id} onChange={handleInputChange} disabled={isSaving} required style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
+                    <option value="">-- Select Branch --</option>
+                    {stores.map(store => (
+                      <option key={store.id} value={store.id}>{store.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Pilih Menu Akses */}
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#0f172a', display: 'block', marginBottom: '10px' }}>2. Page Access Permissions</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    {AVAILABLE_PAGES.map(page => (
+                      <label key={page.id} style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={formData.visible_pages.includes(page.id)}
+                          onChange={() => handleCheckboxChange(page.id)}
+                          disabled={isSaving}
+                          style={{ marginRight: '8px' }}
+                        />
+                        {page.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
             </div>
+          )}
+
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+            <button type="submit" disabled={isSaving} style={{ padding: '12px 30px', background: isSaving ? '#94a3b8' : (editingUserId ? '#f59e0b' : '#2563eb'), color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+              {isSaving ? 'Processing...' : (editingUserId ? 'Update Account' : 'Create Account')}
+            </button>
           </div>
+        </form>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '30px' }}>
+        {/* USERS LIST TABLE */}
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <h3 style={{ margin: 0, padding: '15px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#334155' }}>
+            Registered System Users
+          </h3>
+          
+          {loading ? (
+            <p style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Loading users...</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', fontSize: '0.85rem' }}>
+                    <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Name</th>
+                    <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Role & Branch</th>
+                    <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Page Access</th>
+                    <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>No users found.</td>
+                    </tr>
+                  ) : (
+                    users.map(u => (
+                      <tr key={u.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: editingUserId === u.id ? '#fffbeb' : '#fff' }}>
+                        <td style={{ padding: '12px 20px' }}>
+                          <div style={{ fontWeight: 'bold', color: '#1e293b' }}>{u.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{u.email}</div>
+                        </td>
+                        <td style={{ padding: '12px 20px' }}>
+                          <span style={{ display: 'inline-block', marginBottom: '5px', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', backgroundColor: u.role === 'admin' ? '#dbeafe' : '#fef3c7', color: u.role === 'admin' ? '#1e40af' : '#92400e' }}>
+                            {u.role.toUpperCase()}
+                          </span>
+                          <div style={{ color: '#475569', fontSize: '0.85rem' }}>
+                            {u.role === 'admin' ? <em style={{ color: '#94a3b8' }}>All Stores</em> : (u.store?.name || `Store ID: ${u.store_id}`)}
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 20px', color: '#475569', fontSize: '0.85rem' }}>
+                          {/* LOGIKA TAMPILAN PAGE ACCESS RINGKAS */}
+                          {u.role === 'admin' ? (
+                            <span style={{ color: '#10b981', fontWeight: 'bold' }}>All Pages Allowed</span>
+                          ) : (
+                            (() => {
+                              let pages = [];
+                              if (u.visible_pages) {
+                                if (typeof u.visible_pages === 'string') {
+                                  try { pages = JSON.parse(u.visible_pages); } catch(e) {}
+                                } else if (Array.isArray(u.visible_pages)) {
+                                  pages = u.visible_pages;
+                                }
+                              }
+
+                              if (pages.length === 0) {
+                                return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>No Access</span>;
+                              }
+                              
+                              if (pages.length === AVAILABLE_PAGES.length) {
+                                return <span style={{ color: '#10b981', fontWeight: 'bold' }}>Full Access</span>;
+                              }
+
+                              return (
+                                <div>
+                                  <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>Limited Access</span>
+                                  <div style={{ fontSize: '0.75rem', marginTop: '4px', color: '#64748b' }}>
+                                    ({pages.length} features enabled)
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 20px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button 
+                              onClick={() => handleEditUserClick(u)} 
+                              disabled={isSaving} 
+                              style={{ padding: '6px 12px', background: isSaving ? '#f1f5f9' : '#fef3c7', color: isSaving ? '#94a3b8' : '#d97706', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteUser(u.id)} 
+                              disabled={isSaving} 
+                              style={{ padding: '6px 12px', background: isSaving ? '#f1f5f9' : '#fee2e2', color: isSaving ? '#94a3b8' : '#b91c1c', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* STORES / BRANCHES MANAGEMENT */}
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <h3 style={{ margin: 0, padding: '15px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Branch List</span>
+          </h3>
+          
+          <form onSubmit={handleCreateStore} style={{ display: 'flex', gap: '10px', padding: '15px 20px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
+            <input 
+              type="text" placeholder="New branch name..." value={newStoreName} onChange={(e) => setNewStoreName(e.target.value)} disabled={isSaving} required 
+              style={{ flex: 1, padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} 
+            />
+            <button type="submit" disabled={isSaving} style={{ padding: '8px 15px', background: isSaving ? '#94a3b8' : '#10b981', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+              Add
+            </button>
+          </form>
+
+          {loading ? (
+            <p style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Loading stores...</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#fff', color: '#475569', fontSize: '0.85rem' }}>
+                  <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', width: '50px', textAlign: 'center' }}>No.</th>
+                  <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>Branch Name</th>
+                  <th style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', textAlign: 'center', width: '120px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stores.length === 0 ? (
+                  <tr>
+                    <td colSpan="3" style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>No branches found.</td>
+                  </tr>
+                ) : (
+                  stores.map((store, index) => (
+                    <tr key={store.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '12px 20px', color: '#64748b', fontWeight: 'bold', textAlign: 'center' }}>{index + 1}</td>
+                      <td style={{ padding: '12px 20px' }}>
+                        {editingStoreId === store.id ? (
+                          <input type="text" value={editStoreName} onChange={(e) => setEditStoreName(e.target.value)} disabled={isSaving} autoFocus style={{ width: '100%', padding: '6px', border: '1px solid #3b82f6', borderRadius: '4px' }} />
+                        ) : (
+                          <span style={{ fontWeight: 'bold', color: '#1e293b' }}>{store.name}</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px 20px', textAlign: 'center' }}>
+                        {editingStoreId === store.id ? (
+                          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                            <button onClick={() => handleSaveEditStore(store.id)} disabled={isSaving} style={{ padding: '6px 10px', background: isSaving ? '#94a3b8' : '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Save</button>
+                            <button onClick={handleCancelEditStore} disabled={isSaving} style={{ padding: '6px 10px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '4px', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Cancel</button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditStoreClick(store)} disabled={isSaving} style={{ padding: '6px 12px', background: isSaving ? '#e2e8f0' : '#f59e0b', color: isSaving ? '#94a3b8' : '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
+                              Edit
+                            </button>
+                            <button onClick={() => handleDeleteStore(store.id)} disabled={isSaving} style={{ padding: '6px 12px', background: isSaving ? '#f1f5f9' : '#fee2e2', color: isSaving ? '#94a3b8' : '#b91c1c', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

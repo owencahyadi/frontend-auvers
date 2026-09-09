@@ -9,21 +9,14 @@ export default function OperationalNotesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState('');
 
-  const [activeModal, setActiveModal] = useState(null); // 'add', 'edit', null
+  const [activeModal, setActiveModal] = useState(null); 
   const [editingId, setEditingId] = useState(null);
   const [noteToDelete, setNoteToDelete] = useState(null);
   const [feedback, setFeedback] = useState({ type: '', text: '' });
 
   const initialForm = {
-    item: '',
-    username: '',
-    password: '',
-    cut_off_time: '',
-    delivery_day: '',
-    minimum_order: '',
-    contact: '',
-    phone: '',
-    noted: ''
+    item: '', username: '', password: '', cut_off_time: '',
+    delivery_day: '', minimum_order: '', contact: '', phone: '', noted: ''
   };
 
   const [formData, setFormData] = useState(initialForm);
@@ -55,15 +48,10 @@ export default function OperationalNotesPage() {
 
   const handleOpenEdit = (note) => {
     setFormData({
-      item: note.item || '',
-      username: note.username || '',
-      password: note.password || '',
-      cut_off_time: note.cut_off_time || '',
-      delivery_day: note.delivery_day || '',
-      minimum_order: note.minimum_order || '',
-      contact: note.contact || '',
-      phone: note.phone || '',
-      noted: note.noted || ''
+      item: note.item || '', username: note.username || '', password: note.password || '',
+      cut_off_time: note.cut_off_time || '', delivery_day: note.delivery_day || '',
+      minimum_order: note.minimum_order || '', contact: note.contact || '',
+      phone: note.phone || '', noted: note.noted || ''
     });
     setEditingId(note.id);
     setFeedback({ type: '', text: '' });
@@ -75,11 +63,7 @@ export default function OperationalNotesPage() {
     setFeedback({ type: '', text: '' });
     setIsSaving(true);
 
-    const payload = {
-      ...formData,
-      store_id: activeStoreId || null
-    };
-
+    const payload = { ...formData, store_id: activeStoreId || null };
     const request = editingId 
       ? api.put(`/operational-notes/${editingId}`, payload)
       : api.post('/operational-notes', payload);
@@ -102,9 +86,7 @@ export default function OperationalNotesPage() {
         fetchNotes();
         setNoteToDelete(null);
       })
-      .catch(() => {
-        alert('Failed to delete note.');
-      })
+      .catch(() => alert('Failed to delete note.'))
       .finally(() => setIsSaving(false));
   };
 
@@ -116,30 +98,28 @@ export default function OperationalNotesPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
-        <div>
-          <h1 style={{ margin: 0, color: '#0f172a' }}>📋 Operational Notes & Vendor Info</h1>
-          <p style={{ margin: '5px 0 0 0', color: '#64748b', fontSize: '0.95rem' }}>
-            Store logins, cut-off schedules, vendor order contacts, and delivery terms.
-          </p>
-        </div>
+      {/* JUDUL DAN DESKRIPSI */}
+      <h1 style={{ margin: 0, color: '#0f172a' }}>📋 Operational Notes & Vendor Info</h1>
+      <p style={{ margin: '5px 0 15px 0', color: '#64748b', fontSize: '0.95rem' }}>
+        Store logins, cut-off schedules, vendor order contacts, and delivery terms.
+      </p>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <input 
-            type="text" 
-            placeholder="Search vendor / item..." 
-            value={search} 
-            onChange={e => setSearch(e.target.value)} 
-            style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem' }} 
-          />
-          <button 
-            onClick={handleOpenAdd}
-            disabled={loading || isSaving}
-            style={{ padding: '9px 16px', background: '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            + Add New Entry
-          </button>
-        </div>
+      {/* ACTION & SEARCH BAR (Tepat di bawah teks deskripsi, rata kiri) */}
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '20px' }}>
+        <button 
+          onClick={handleOpenAdd}
+          disabled={loading || isSaving}
+          style={{ padding: '9px 16px', background: '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: (loading || isSaving) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
+        >
+          + Add New Entry
+        </button>
+        <input 
+          type="text" 
+          placeholder="Search vendor / item..." 
+          value={search} 
+          onChange={e => setSearch(e.target.value)} 
+          style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', width: '250px' }} 
+        />
       </div>
 
       {feedback.text && (
