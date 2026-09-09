@@ -384,7 +384,17 @@ export default function PayrollPage() {
                     </div>
 
                     <label style={{ fontSize: '0.9em', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#e0f2fe', padding: '10px', borderRadius: '5px', fontWeight: 'bold', color: '#0369a1' }}>
-                      <input type="checkbox" checked={updateRateData.is_fixed_salary} onChange={(e) => setUpdateRateData({...updateRateData, is_fixed_salary: e.target.checked})} disabled={isSaving} />
+                      <input 
+                        type="checkbox" 
+                        checked={updateRateData.is_fixed_salary} 
+                        onChange={(e) => {
+                          setUpdateRateData({...updateRateData, is_fixed_salary: e.target.checked});
+                          if (e.target.checked) {
+                            setIsWeeklyOnly(false); // Paksa matikan "Weekly Only" jika Base Allowance dicentang
+                          }
+                        }} 
+                        disabled={isSaving} 
+                      />
                       Add Weekly Base Allowance ($)
                     </label>
 
@@ -406,8 +416,8 @@ export default function PayrollPage() {
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Max Normal Hrs</label><input type="number" step="1" name="ot_threshold" value={updateRateData.ot_threshold} onChange={(e) => setUpdateRateData({...updateRateData, ot_threshold: e.target.value})} required disabled={isSaving} placeholder="e.g. 38" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     </div>
 
-                    <label style={{ fontSize: '0.9em', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#fff3e0', padding: '10px', borderRadius: '5px' }}>
-                      <input type="checkbox" checked={isWeeklyOnly} onChange={(e) => setIsWeeklyOnly(e.target.checked)} disabled={isSaving} />
+                    <label style={{ fontSize: '0.9em', cursor: (isSaving || updateRateData.is_fixed_salary) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#fff3e0', padding: '10px', borderRadius: '5px', opacity: updateRateData.is_fixed_salary ? 0.5 : 1 }}>
+                      <input type="checkbox" checked={isWeeklyOnly} onChange={(e) => setIsWeeklyOnly(e.target.checked)} disabled={isSaving || updateRateData.is_fixed_salary} />
                       Apply hourly changes ONLY for this current week
                     </label>
                     
@@ -533,7 +543,6 @@ export default function PayrollPage() {
               {payrollData.map((staff) => (
                 <tr key={staff.id}>
                   
-                  {/* TAMPILAN NAMA DENGAN BADGE BASE ALLOWANCE */}
                   <td style={{ textAlign: 'left', padding: '6px 4px', fontWeight: staff.is_fixed_salary ? 'bold' : 'normal', color: staff.is_fixed_salary ? '#0284c7' : '#000' }}>
                     {staff.name} 
                     {staff.is_fixed_salary && (
@@ -543,7 +552,6 @@ export default function PayrollPage() {
                     )}
                   </td>
                   
-                  {/* TAMPILAN RATE (Selalu memunculkan rate per-jam normalnya) */}
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_weekday)}</td>
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_sat)}</td>
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_sun)}</td>
@@ -560,7 +568,6 @@ export default function PayrollPage() {
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_sat)}</td>
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_sun)}</td>
                   
-                  {/* GRAND TOTAL OTOMATIS SUDAH DITAMBAH BASE ALLOWANCE DARI BACKEND */}
                   <td style={{ padding: '6px 4px', fontWeight: 'bold', color: staff.is_fixed_salary ? '#e65100' : 'inherit' }}>
                     {formatMoney(staff.grand_total)}
                   </td>
