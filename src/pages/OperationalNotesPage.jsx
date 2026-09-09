@@ -100,7 +100,7 @@ export default function OperationalNotesPage() {
     <div>
       {/* JUDUL DAN DESKRIPSI */}
       <h1 style={{ margin: 0, color: '#0f172a' }}>📋 Operational Notes & Vendor Info</h1>
-      <p style={{ margin: '5px 0 15px 0', color: '#64748b', fontSize: '0.95rem' }}>
+      <p style={{ margin: '30px 0 15px 0', color: '#64748b', fontSize: '0.95rem' }}>
         Store logins, cut-off schedules, vendor order contacts, and delivery terms.
       </p>
 
