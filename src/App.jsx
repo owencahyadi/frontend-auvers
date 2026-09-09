@@ -10,6 +10,7 @@ import PurchasePage from './pages/PurchasePage';
 import ProfitLossPage from './pages/ProfitLossPage';
 import OperationalCostPage from './pages/OperationalCostPage';
 import UserManagementPage from './pages/UserManagementPage'; 
+import OperationalNotesPage from './pages/OperationalNotesPage';
 
 // IMPORT STORE PROVIDER DARI CONTEXT
 import { StoreProvider } from './context/StoreContext'; 
@@ -106,6 +107,10 @@ function App() {
 
             <Route element={<ProtectedRoute requiredPermission="operational_costs" />}>
               <Route path="/operational-costs" element={<OperationalCostPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute requiredPermission="operational_notes" />}>
+              <Route path="/operational-notes" element={<OperationalNotesPage />} />
             </Route>
 
           </Route>

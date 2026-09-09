@@ -136,6 +136,12 @@ export default function Sidebar() {
               📊 P&L
             </NavLink>
           )}
+
+          {(isAdmin || myPermissions.includes('operational_notes')) && (
+            <NavLink to="/operational-notes" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              📋 Operational Notes
+            </NavLink>
+          )}
         </nav>
 
         <div style={{ padding: '20px' }}>

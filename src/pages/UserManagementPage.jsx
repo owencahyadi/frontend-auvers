@@ -8,6 +8,7 @@ const AVAILABLE_PAGES = [
   { id: 'purchases', label: '🛒 Purchases / COGS' },
   { id: 'operational_costs', label: '⚡ Operational Costs' },
   { id: 'calendar', label: '📅 View Schedule' },
+  { id: 'operational_notes', label: '📋 View Operational Notes' },
   
   // -- GRUP PAYROLL & ROSTER --
   { id: 'roster_payroll', label: '📅 VIEW: Roster & Payroll Page' },
