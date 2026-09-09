@@ -12,10 +12,9 @@ export default function PurchasePage() {
     const savedDate = localStorage.getItem('purchase_week_start');
     if (savedDate) return savedDate;
 
-    // Jika belum ada data tersimpan, cari hari Senin minggu ini
     const d = new Date();
     const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust jika hari Minggu
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(d.setDate(diff));
     
     const year = monday.getFullYear();
@@ -25,23 +24,24 @@ export default function PurchasePage() {
     return `${year}-${month}-${date}`;
   });
 
-  // 2. Simpan setiap perubahan tanggal ke localStorage
   useEffect(() => {
     localStorage.setItem('purchase_week_start', weekStart);
   }, [weekStart]);
 
   // INPUT FORM STATE
   const [purchaseData, setPurchaseData] = useState({
-    purchase_date: new Date().toISOString().split('T')[0], // Default ke hari ini
+    purchase_date: new Date().toISOString().split('T')[0], 
     supplier_item_id: '',
     quantity: '',
-    new_price: '' // Will be used to store the custom Total Price
+    new_price: '' 
   });
+
+  // STATE BARU: Untuk melacak Kategori yang sedang dipilih di form
+  const [selectedFormCategory, setSelectedFormCategory] = useState('');
 
   const [feedback, setFeedback] = useState({ type: '', text: '' });
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
 
-  // STATE: Untuk Modal Peringatan Perubahan Harga
   const [showPriceWarning, setShowPriceWarning] = useState(false);
   const [priceWarningData, setPriceWarningData] = useState({ itemName: '', oldUnit: 0, newUnit: 0 });
 
@@ -64,12 +64,10 @@ export default function PurchasePage() {
     fetchData();
   }, []);
 
-  // Mencegat proses submit untuk mengecek perbedaan harga
   const handleInitialSubmit = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
 
-    // Jika kolom Total Bill (new_price) diisi, lakukan pengecekan harga satuan
     if (purchaseData.new_price && purchaseData.quantity) {
       const selectedItem = supplierItems.find(i => i.id == purchaseData.supplier_item_id);
       
@@ -77,7 +75,6 @@ export default function PurchasePage() {
         const oldUnitPrice = parseFloat(selectedItem.price);
         const newUnitPrice = parseFloat(purchaseData.new_price) / parseFloat(purchaseData.quantity);
 
-        // Toleransi perbedaan harga (jika beda lebih dari 1 sen, munculkan warning)
         if (Math.abs(oldUnitPrice - newUnitPrice) > 0.01) {
           setPriceWarningData({
             itemName: selectedItem.item_name,
@@ -85,23 +82,22 @@ export default function PurchasePage() {
             newUnit: newUnitPrice
           });
           setShowPriceWarning(true);
-          return; // Hentikan proses simpan di sini
+          return; 
         }
       }
     }
 
-    // Jika tidak ada perbedaan harga atau kolom kosong, langsung jalankan simpan
     executePurchase();
   };
 
-  // Fungsi aktual yang memanggil API untuk menyimpan data
   const executePurchase = () => {
     setIsSaving(true);
-    setShowPriceWarning(false); // Tutup modal warning
+    setShowPriceWarning(false); 
 
     api.post('/purchases', purchaseData).then((res) => {
       setFeedback({ type: 'success', text: res.data.message || 'Purchase record saved successfully!' });
       
+      // Reset input form, tapi biarkan Kategori dan Tanggal tetap sama untuk kemudahan input berturut-turut
       setPurchaseData({
         ...purchaseData,
         supplier_item_id: '',
@@ -153,6 +149,10 @@ export default function PurchasePage() {
 
   const totalExpense = filteredPurchases.reduce((sum, p) => sum + parseFloat(p.total_price), 0);
 
+  // LOGIKA DROPDOWN DINAMIS
+  const uniqueCategories = [...new Set(supplierItems.map(item => item.category))].sort();
+  const availableItemsInSelectedCategory = supplierItems.filter(item => item.category === selectedFormCategory);
+
   return (
     <div>
       <h1 style={{ margin: '0 0 10px 0', lineHeight: '1.2', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -189,24 +189,53 @@ export default function PurchasePage() {
         <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #ddd' }}>
           <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0d47a1' }}>+ Add Purchase Transaction</h3>
           <form onSubmit={handleInitialSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Purchase Date</label>
               <input type="date" value={purchaseData.purchase_date} onChange={e => setPurchaseData({...purchaseData, purchase_date: e.target.value})} disabled={isSaving} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
             </div>
             
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Select Item (from Supplier Catalog)</label>
-              <select value={purchaseData.supplier_item_id} onChange={e => setPurchaseData({...purchaseData, supplier_item_id: e.target.value})} disabled={isSaving} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
-                <option value="">-- Select Item --</option>
-                {supplierItems.map(item => (
-                  <option key={item.id} value={item.id}>
-                    [{item.category}] {item.item_name} ({item.measurement}) - ${parseFloat(item.price).toFixed(2)}/unit
-                  </option>
-                ))}
-              </select>
+            {/* DUAL DROPDOWN (KATEGORI -> BARANG) */}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#0f172a' }}>1. Filter by Category</label>
+                <select 
+                  value={selectedFormCategory} 
+                  onChange={e => {
+                    setSelectedFormCategory(e.target.value);
+                    setPurchaseData({...purchaseData, supplier_item_id: ''}); // Wajib reset item_id jika kategori diubah
+                  }} 
+                  disabled={isSaving} 
+                  required 
+                  style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff', border: '1px solid #94a3b8' }}
+                >
+                  <option value="">-- Category --</option>
+                  {uniqueCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ flex: 2 }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#0f172a' }}>2. Select Item</label>
+                <select 
+                  value={purchaseData.supplier_item_id} 
+                  onChange={e => setPurchaseData({...purchaseData, supplier_item_id: e.target.value})} 
+                  disabled={isSaving || !selectedFormCategory} // Disable jika belum pilih kategori
+                  required 
+                  style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: (isSaving || !selectedFormCategory) ? '#f1f5f9' : '#fff', border: '1px solid #94a3b8' }}
+                >
+                  <option value="">-- Select Item --</option>
+                  {availableItemsInSelectedCategory.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.item_name} ({item.measurement}) - ${parseFloat(item.price).toFixed(2)}/unit
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Quantity (Qty)</label>
                 <input type="number" step="0.01" value={purchaseData.quantity} onChange={e => setPurchaseData({...purchaseData, quantity: e.target.value})} disabled={isSaving} required placeholder="e.g. 5" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
@@ -221,7 +250,7 @@ export default function PurchasePage() {
             </div>
             <p style={{ margin: '0', fontSize: '0.75rem', color: '#64748b' }}>*If the "Total Bill" field is filled, the unit price in the Supplier Catalog will be updated automatically (Total Bill ÷ Qty).</p>
 
-            <button type="submit" disabled={isSaving} style={{ padding: '10px', background: isSaving ? '#94a3b8' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '4px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 'bold', marginTop: '5px' }}>
+            <button type="submit" disabled={isSaving || !purchaseData.supplier_item_id} style={{ padding: '12px', background: (isSaving || !purchaseData.supplier_item_id) ? '#94a3b8' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '4px', cursor: (isSaving || !purchaseData.supplier_item_id) ? 'not-allowed' : 'pointer', fontWeight: 'bold', marginTop: '5px' }}>
               {isSaving ? 'Processing...' : 'Save Transaction'}
             </button>
           </form>
