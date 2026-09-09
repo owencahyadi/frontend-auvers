@@ -116,26 +116,26 @@ export default function OperationalNotesPage() {
 
   return (
     <div>
-      {/* HEADER SECTION */}
+      {/* JUDUL HALAMAN */}
       <div style={{ marginBottom: '25px' }}>
-        <h1 style={{ margin: 0, color: '#0f172a' }}>📋 Operational Notes & Vendor Info</h1>
-        <p style={{ margin: '30px 0 0 0', color: '#64748b', fontSize: '0.95rem' }}>
+        <h1 style={{ marginBottom: '25px', color: '#0f172a' }}>📋 Operational Notes & Vendor Info</h1>
+        <p style={{ margin: '5px 0 0 0', color: '#64748b', fontSize: '0.95rem' }}>
           Store logins, cut-off schedules, vendor order contacts, and delivery terms.
         </p>
       </div>
 
       {feedback.text && (
-        <div style={{ padding: '10px 15px', marginBottom: '20px', borderRadius: '6px', fontWeight: 'bold', backgroundColor: feedback.type === 'success' ? '#e8f5e9' : '#ffebee', color: feedback.type === 'success' ? '#2e7d32' : '#c62828', border: `1px solid ${feedback.type === 'success' ? '#a5d6a7' : '#ef9a9a'}` }}>
+        <div style={{ padding: '10px 15px', marginBottom: '15px', borderRadius: '6px', fontWeight: 'bold', backgroundColor: feedback.type === 'success' ? '#e8f5e9' : '#ffebee', color: feedback.type === 'success' ? '#2e7d32' : '#c62828', border: `1px solid ${feedback.type === 'success' ? '#a5d6a7' : '#ef9a9a'}` }}>
           {feedback.text}
         </div>
       )}
 
-      {/* CONTROLS SECTION (Button & Search di kiri atas tabel) */}
-      <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap' }}>
+      {/* ACTION & SEARCH BAR (KIRI ATAS TABEL) */}
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px' }}>
         <button 
           onClick={handleOpenAdd}
           disabled={loading || isSaving}
-          style={{ padding: '10px 16px', background: '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+          style={{ padding: '9px 16px', background: '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: (loading || isSaving) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
         >
           + Add New Entry
         </button>
@@ -144,7 +144,7 @@ export default function OperationalNotesPage() {
           placeholder="Search vendor / item..." 
           value={search} 
           onChange={e => setSearch(e.target.value)} 
-          style={{ padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', minWidth: '250px' }} 
+          style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', width: '250px' }} 
         />
       </div>
 
