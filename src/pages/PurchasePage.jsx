@@ -36,8 +36,9 @@ export default function PurchasePage() {
     new_price: '' 
   });
 
-  // STATE BARU: Untuk melacak Kategori yang sedang dipilih di form
+  // STATE UNTUK MELACAK DROPDOWN BERTINGKAT
   const [selectedFormCategory, setSelectedFormCategory] = useState('');
+  const [selectedFormItemName, setSelectedFormItemName] = useState('');
 
   const [feedback, setFeedback] = useState({ type: '', text: '' });
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
@@ -97,13 +98,13 @@ export default function PurchasePage() {
     api.post('/purchases', purchaseData).then((res) => {
       setFeedback({ type: 'success', text: res.data.message || 'Purchase record saved successfully!' });
       
-      // Reset input form, tapi biarkan Kategori dan Tanggal tetap sama untuk kemudahan input berturut-turut
       setPurchaseData({
         ...purchaseData,
         supplier_item_id: '',
         quantity: '',
         new_price: '' 
       });
+      setSelectedFormItemName('');
       fetchData();
     }).catch(() => {
       setFeedback({ type: 'error', text: 'Failed to save purchase transaction.' });
@@ -149,9 +150,13 @@ export default function PurchasePage() {
 
   const totalExpense = filteredPurchases.reduce((sum, p) => sum + parseFloat(p.total_price), 0);
 
-  // LOGIKA DROPDOWN DINAMIS
+  // LOGIKA 3 TINGKAT DROPDOWN DINAMIS (Category -> Item -> Supplier)
   const uniqueCategories = [...new Set(supplierItems.map(item => item.category))].sort();
-  const availableItemsInSelectedCategory = supplierItems.filter(item => item.category === selectedFormCategory);
+  
+  const itemsInCategory = supplierItems.filter(item => item.category === selectedFormCategory);
+  const uniqueItemNames = [...new Set(itemsInCategory.map(item => item.item_name))].sort();
+  
+  const availableSuppliers = itemsInCategory.filter(item => item.item_name === selectedFormItemName);
 
   return (
     <div>
@@ -170,7 +175,7 @@ export default function PurchasePage() {
           value={weekStart} 
           onChange={e => setWeekStart(e.target.value)} 
           disabled={loading || isSaving}
-          style={{ padding: '6px', fontSize: '1rem', border: '1px solid #ccc', borderRadius: '4px' }} 
+          style={{ padding: '6px 0', fontSize: '1rem', border: 'none', borderBottom: '2px solid #94a3b8', borderRadius: '0', outline: 'none', backgroundColor: 'transparent', cursor: 'pointer' }} 
         />
         <div style={{ background: '#e0f2fe', padding: '6px 12px', borderRadius: '4px', color: '#0369a1', fontSize: '0.9rem', fontWeight: 'bold' }}>
           Displaying: {weekStart} to {weekEnd}
@@ -185,29 +190,37 @@ export default function PurchasePage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px', marginBottom: '30px' }}>
         
-        {/* INPUT FORM */}
+        {/* INPUT FORM (MINIMALIST LINE STYLE) */}
         <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #ddd' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0d47a1' }}>+ Add Purchase Transaction</h3>
-          <form onSubmit={handleInitialSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#0d47a1' }}>+ Add Purchase Transaction</h3>
+          <form onSubmit={handleInitialSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             
             <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Purchase Date</label>
-              <input type="date" value={purchaseData.purchase_date} onChange={e => setPurchaseData({...purchaseData, purchase_date: e.target.value})} disabled={isSaving} required style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>Purchase Date</label>
+              <input 
+                type="date" 
+                value={purchaseData.purchase_date} 
+                onChange={e => setPurchaseData({...purchaseData, purchase_date: e.target.value})} 
+                disabled={isSaving} 
+                required 
+                style={{ padding: '8px 4px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : 'transparent', border: 'none', borderBottom: '2px solid #94a3b8', borderRadius: '0', outline: 'none' }} 
+              />
             </div>
             
-            {/* DUAL DROPDOWN (KATEGORI -> BARANG) */}
-            <div style={{ display: 'flex', gap: '10px' }}>
+            {/* TRIPLE DROPDOWN */}
+            <div style={{ display: 'flex', gap: '15px' }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#0f172a' }}>1. Filter by Category</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>1. Category</label>
                 <select 
                   value={selectedFormCategory} 
                   onChange={e => {
                     setSelectedFormCategory(e.target.value);
-                    setPurchaseData({...purchaseData, supplier_item_id: ''}); // Wajib reset item_id jika kategori diubah
+                    setSelectedFormItemName(''); 
+                    setPurchaseData({...purchaseData, supplier_item_id: ''}); 
                   }} 
                   disabled={isSaving} 
                   required 
-                  style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff', border: '1px solid #94a3b8' }}
+                  style={{ padding: '8px 4px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : 'transparent', border: 'none', borderBottom: '2px solid #94a3b8', borderRadius: '0', outline: 'none' }}
                 >
                   <option value="">-- Category --</option>
                   {uniqueCategories.map(cat => (
@@ -216,41 +229,77 @@ export default function PurchasePage() {
                 </select>
               </div>
               
-              <div style={{ flex: 2 }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#0f172a' }}>2. Select Item</label>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>2. Item Name</label>
+                <select 
+                  value={selectedFormItemName} 
+                  onChange={e => {
+                    setSelectedFormItemName(e.target.value);
+                    setPurchaseData({...purchaseData, supplier_item_id: ''}); 
+                  }} 
+                  disabled={isSaving || !selectedFormCategory} 
+                  required 
+                  style={{ padding: '8px 4px', width: '100%', boxSizing: 'border-box', backgroundColor: (isSaving || !selectedFormCategory) ? '#f1f5f9' : 'transparent', border: 'none', borderBottom: '2px solid #94a3b8', borderRadius: '0', outline: 'none' }}
+                >
+                  <option value="">-- Item Name --</option>
+                  {uniqueItemNames.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ flex: 1.2 }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>3. Select Supplier</label>
                 <select 
                   value={purchaseData.supplier_item_id} 
                   onChange={e => setPurchaseData({...purchaseData, supplier_item_id: e.target.value})} 
-                  disabled={isSaving || !selectedFormCategory} // Disable jika belum pilih kategori
+                  disabled={isSaving || !selectedFormItemName} 
                   required 
-                  style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: (isSaving || !selectedFormCategory) ? '#f1f5f9' : '#fff', border: '1px solid #94a3b8' }}
+                  style={{ padding: '8px 4px', width: '100%', boxSizing: 'border-box', backgroundColor: (isSaving || !selectedFormItemName) ? '#f1f5f9' : 'transparent', border: 'none', borderBottom: '2px solid #94a3b8', borderRadius: '0', outline: 'none' }}
                 >
-                  <option value="">-- Select Item --</option>
-                  {availableItemsInSelectedCategory.map(item => (
+                  <option value="">-- Supplier --</option>
+                  {availableSuppliers.map(item => (
                     <option key={item.id} value={item.id}>
-                      {item.item_name} ({item.measurement}) - ${parseFloat(item.price).toFixed(2)}/unit
+                      {item.supplier_name || 'No Supplier Name'} (${parseFloat(item.price).toFixed(2)}/{item.measurement})
                     </option>
                   ))}
                 </select>
               </div>
             </div>
             
-            <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+            <div style={{ display: 'flex', gap: '15px' }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Quantity (Qty)</label>
-                <input type="number" step="0.01" value={purchaseData.quantity} onChange={e => setPurchaseData({...purchaseData, quantity: e.target.value})} disabled={isSaving} required placeholder="e.g. 5" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>Quantity (Qty)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={purchaseData.quantity} 
+                  onChange={e => setPurchaseData({...purchaseData, quantity: e.target.value})} 
+                  disabled={isSaving} 
+                  required 
+                  placeholder="e.g. 5" 
+                  style={{ padding: '8px 4px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : 'transparent', border: 'none', borderBottom: '2px solid #94a3b8', borderRadius: '0', outline: 'none' }} 
+                />
               </div>
               
               <div style={{ flex: 1.2 }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>
                   Total Bill ($) - <span style={{ color: '#e65100', fontWeight: 'normal' }}>Optional</span>
                 </label>
-                <input type="number" step="0.01" value={purchaseData.new_price} onChange={e => setPurchaseData({...purchaseData, new_price: e.target.value})} disabled={isSaving} placeholder="Input total bill to update catalog" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '1px solid #ffcc80', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} />
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={purchaseData.new_price} 
+                  onChange={e => setPurchaseData({...purchaseData, new_price: e.target.value})} 
+                  disabled={isSaving} 
+                  placeholder="Input total bill to update catalog" 
+                  style={{ padding: '8px 4px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : 'transparent', border: 'none', borderBottom: '2px solid #fb923c', borderRadius: '0', outline: 'none' }} 
+                />
               </div>
             </div>
-            <p style={{ margin: '0', fontSize: '0.75rem', color: '#64748b' }}>*If the "Total Bill" field is filled, the unit price in the Supplier Catalog will be updated automatically (Total Bill ÷ Qty).</p>
+            <p style={{ margin: '0', fontSize: '0.75rem', color: '#94a3b8' }}>*If the "Total Bill" field is filled, the unit price in the Supplier Catalog will be updated automatically (Total Bill ÷ Qty).</p>
 
-            <button type="submit" disabled={isSaving || !purchaseData.supplier_item_id} style={{ padding: '12px', background: (isSaving || !purchaseData.supplier_item_id) ? '#94a3b8' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '4px', cursor: (isSaving || !purchaseData.supplier_item_id) ? 'not-allowed' : 'pointer', fontWeight: 'bold', marginTop: '5px' }}>
+            <button type="submit" disabled={isSaving || !purchaseData.supplier_item_id} style={{ padding: '12px', background: (isSaving || !purchaseData.supplier_item_id) ? '#cbd5e1' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '4px', cursor: (isSaving || !purchaseData.supplier_item_id) ? 'not-allowed' : 'pointer', fontWeight: 'bold', marginTop: '10px' }}>
               {isSaving ? 'Processing...' : 'Save Transaction'}
             </button>
           </form>
