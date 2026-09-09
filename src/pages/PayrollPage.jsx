@@ -5,15 +5,13 @@ import * as XLSX from 'xlsx';
 export default function PayrollPage() {
   const [weeklySales, setWeeklySales] = useState(0); 
   
-  // 1. Logika mencari hari Senin minggu ini untuk default Roster Report
   const [weekStart, setWeekStart] = useState(() => {
     const savedDate = localStorage.getItem('payroll_week_start');
     if (savedDate) return savedDate;
 
-    // Jika belum ada data tersimpan, cari hari Senin minggu ini
     const d = new Date();
     const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust jika hari Minggu
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
     const monday = new Date(d.setDate(diff));
     
     const year = monday.getFullYear();
@@ -26,16 +24,12 @@ export default function PayrollPage() {
   const [payrollData, setPayrollData] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // STATE BARU: Mencegah double submit pada form
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- LOGIKA HAK AKSES (PERMISSIONS) ---
   const currentUser = JSON.parse(localStorage.getItem('user')) || {};
   const isSuperAdmin = currentUser.role === 'admin';
   const myPermissions = currentUser.visible_pages || [];
 
-  // Tentukan apakah user boleh melihat tombol-tombol ini
   const canAddStaff = isSuperAdmin || myPermissions.includes('act_add_staff');
   const canEditRate = isSuperAdmin || myPermissions.includes('act_edit_rate');
   const canInputShift = isSuperAdmin || myPermissions.includes('act_input_shift');
@@ -43,15 +37,20 @@ export default function PayrollPage() {
   const [activeModal, setActiveModal] = useState(null); 
   const [feedback, setFeedback] = useState({ type: '', text: '' }); 
 
-  const [staffData, setStaffData] = useState({ name: '', position: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
-  const [updateRateData, setUpdateRateData] = useState({ employee_id: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
+  const [staffData, setStaffData] = useState({ 
+    name: '', position: '', is_fixed_salary: false, fixed_salary_amount: '', 
+    base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' 
+  });
+  
+  const [updateRateData, setUpdateRateData] = useState({ 
+    employee_id: '', is_fixed_salary: false, fixed_salary_amount: '', 
+    base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' 
+  });
+  
   const [isWeeklyOnly, setIsWeeklyOnly] = useState(false);
   
-  // 2. Logika mengambil tanggal hari ini persis untuk default Form Input Shift
   const [shiftData, setShiftData] = useState(() => {
     const savedDate = localStorage.getItem('last_shift_date');
-    
-    // Bikin format YYYY-MM-DD hari ini
     const today = new Date();
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -59,12 +58,8 @@ export default function PayrollPage() {
     const defaultToday = `${year}-${month}-${day}`;
 
     return { 
-      employee_id: '', 
-      date: savedDate || defaultToday, 
-      is_unavailable: false,
-      start_1: '', end_1: '', role_1: '',
-      start_2: '', end_2: '', role_2: '',
-      applied_rate_2: ''
+      employee_id: '', date: savedDate || defaultToday, is_unavailable: false,
+      start_1: '', end_1: '', role_1: '', start_2: '', end_2: '', role_2: '', applied_rate_2: ''
     };
   });
 
@@ -78,7 +73,6 @@ export default function PayrollPage() {
     api.get('/employees').then(res => setEmployees(res.data.data));
   };
 
-  // Simpan weekStart ke localStorage setiap kali user mengubahnya
   useEffect(() => { 
     localStorage.setItem('payroll_week_start', weekStart);
     fetchData(); 
@@ -86,7 +80,6 @@ export default function PayrollPage() {
 
   useEffect(() => {
     if (activeModal === 'shift' && shiftData.employee_id && shiftData.date) {
-      // Kita bisa disable cek ini juga jika sedang saving, tapi GET request ini ringan
       api.get(`/rosters/calendar?start_date=${shiftData.date}`)
         .then(res => {
           const existingShift = res.data.data.find(
@@ -110,19 +103,16 @@ export default function PayrollPage() {
             setShiftData(prev => ({
               ...prev,
               is_unavailable: false,
-              start_1: '', end_1: '', role_1: '',
-              start_2: '', end_2: '', role_2: '',
-              applied_rate_2: '' 
+              start_1: '', end_1: '', role_1: '', start_2: '', end_2: '', role_2: '', applied_rate_2: '' 
             }));
             setFeedback({ type: '', text: '' });
           }
-        })
-        .catch(() => console.log('Failed to check schedule.'));
+        }).catch(() => console.log('Failed to check schedule.'));
     }
   }, [shiftData.employee_id, shiftData.date, activeModal]);
 
   const closeModal = () => {
-    if (isSaving) return; // Mencegah modal tertutup saat sedang loading
+    if (isSaving) return; 
     setActiveModal(null);
     setFeedback({ type: '', text: '' }); 
   };
@@ -130,17 +120,15 @@ export default function PayrollPage() {
   const handleStaffSubmit = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
-    setIsSaving(true); // Aktifkan Loading
+    setIsSaving(true); 
 
     api.post('/employees', staffData).then(() => {
       setFeedback({ type: 'success', text: 'New employee successfully added!' });
-      setStaffData({ name: '', position: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
+      setStaffData({ name: '', position: '', is_fixed_salary: false, fixed_salary_amount: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
       fetchData();
     }).catch(() => {
       setFeedback({ type: 'error', text: 'Failed to save employee.' });
-    }).finally(() => {
-      setIsSaving(false); // Matikan Loading
-    });
+    }).finally(() => setIsSaving(false));
   };
 
   const handleUpdateRateSubmit = (e) => {
@@ -150,49 +138,45 @@ export default function PayrollPage() {
       return;
     }
     setFeedback({ type: '', text: '' });
-    setIsSaving(true); // Aktifkan Loading
+    setIsSaving(true); 
     
     if (isWeeklyOnly) {
       api.put(`/employees/${updateRateData.employee_id}/weekly-rates`, { ...updateRateData, start_date: weekStart })
       .then(() => {
         setFeedback({ type: 'success', text: 'SPECIAL rate for this week updated successfully!' });
-        setUpdateRateData({ employee_id: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
+        setUpdateRateData({ employee_id: '', is_fixed_salary: false, fixed_salary_amount: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
         setIsWeeklyOnly(false);
         fetchData(); 
       }).catch(err => {
         setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to update special rate.' });
-      }).finally(() => setIsSaving(false)); // Matikan Loading
+      }).finally(() => setIsSaving(false)); 
     } else {
       api.put(`/employees/${updateRateData.employee_id}/rates`, updateRateData)
       .then(() => {
         setFeedback({ type: 'success', text: 'Master Rate updated permanently!' });
-        setUpdateRateData({ employee_id: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
+        setUpdateRateData({ employee_id: '', is_fixed_salary: false, fixed_salary_amount: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
         fetchData(); 
       }).catch(() => {
         setFeedback({ type: 'error', text: 'Failed to update master rate.' });
-      }).finally(() => setIsSaving(false)); // Matikan Loading
+      }).finally(() => setIsSaving(false)); 
     }
   };
 
   const handleShiftSubmit = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
-    setIsSaving(true); // Aktifkan Loading
+    setIsSaving(true); 
 
     api.post('/rosters', shiftData).then(() => {
       setFeedback({ type: 'success', text: 'Shift schedule saved successfully!' });
-      
-      // Hanya reset form selain tanggal
       setShiftData(prev => ({ 
-        employee_id: '', 
-        date: prev.date, // Pertahankan tanggal
-        is_unavailable: false,
+        employee_id: '', date: prev.date, is_unavailable: false,
         start_1: '', end_1: '', role_1: '', start_2: '', end_2: '', role_2: '', applied_rate_2: ''
       }));
       fetchData();
     }).catch(() => {
       setFeedback({ type: 'error', text: 'Failed to add shift.' });
-    }).finally(() => setIsSaving(false)); // Matikan Loading
+    }).finally(() => setIsSaving(false)); 
   };
 
   const handleShiftChange = (e) => {
@@ -206,16 +190,12 @@ export default function PayrollPage() {
   const handleTimeInput = (e) => {
     const { name, value } = e.target;
     let numericValue = value.replace(/\D/g, '');
-    
-    if (numericValue.length > 4) {
-      numericValue = numericValue.substring(0, 4);
-    }
+    if (numericValue.length > 4) numericValue = numericValue.substring(0, 4);
     
     let formattedValue = numericValue;
     if (numericValue.length >= 3) {
       formattedValue = `${numericValue.substring(0, 2)}:${numericValue.substring(2)}`;
     }
-    
     setShiftData({ ...shiftData, [name]: formattedValue });
   };
 
@@ -239,7 +219,7 @@ export default function PayrollPage() {
 
     const rows = [];
     rows.push([
-      'Name', 'Weekday Rate', 'Sat Rate', 'Sun Rate',
+      'Name', 'Wkday Rate', 'Sat Rate', 'Sun Rate', 'Base Allowance',
       'Sun', 'Sat', 'Fri', 'Thu', 'Wed', 'Tue', 'Mon', 
       'Total Weekday', 'Total Sat', 'Total Sun', 'Grand Total',
       'Sales', 'Labor %'
@@ -251,6 +231,7 @@ export default function PayrollPage() {
         parseFloat(staff.rate_weekday) || 0,
         parseFloat(staff.rate_sat) || 0,
         parseFloat(staff.rate_sun) || 0,
+        staff.is_fixed_salary ? parseFloat(staff.fixed_salary_amount) : 0,
         parseFloat(staff.pay_sun) || 0,
         parseFloat(staff.pay_sat) || 0,
         parseFloat(staff.pay_fri) || 0,
@@ -262,8 +243,7 @@ export default function PayrollPage() {
         parseFloat(staff.pay_sat) || 0,
         parseFloat(staff.pay_sun) || 0,
         parseFloat(staff.grand_total) || 0,
-        "", 
-        ""  
+        "", ""  
       ]);
     });
 
@@ -276,7 +256,7 @@ export default function PayrollPage() {
 
     rows.push([
       'GRAND TOTAL',
-      '', '', '', 
+      '', '', '', '', 
       parseFloat(footerTotals.sun) || 0,
       parseFloat(footerTotals.sat) || 0,
       parseFloat(footerTotals.fri) || 0,
@@ -349,6 +329,7 @@ export default function PayrollPage() {
                 disabled={isSaving} 
                 style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: isSaving ? 'not-allowed' : 'pointer', color: '#666' }}>✖</button>
 
+              {/* MODAL 1: ADD NEW EMPLOYEE */}
               {activeModal === 'staff' && (
                 <div>
                   <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#0d47a1' }}>Add New Employee</h3>
@@ -356,6 +337,21 @@ export default function PayrollPage() {
                   <form onSubmit={handleStaffSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     <div><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Staff Name</label><input type="text" name="name" value={staffData.name} onChange={(e) => setStaffData({...staffData, name: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     <div><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Position</label><input type="text" name="position" value={staffData.position} onChange={(e) => setStaffData({...staffData, position: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
+                    
+                    <label style={{ fontSize: '0.9em', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#e0f2fe', padding: '10px', borderRadius: '5px', fontWeight: 'bold', color: '#0369a1' }}>
+                      <input type="checkbox" checked={staffData.is_fixed_salary} onChange={(e) => setStaffData({...staffData, is_fixed_salary: e.target.checked})} disabled={isSaving} />
+                      Add Weekly Base Allowance ($)
+                    </label>
+
+                    {staffData.is_fixed_salary && (
+                      <div style={{ background: '#f0f9ff', padding: '10px', borderRadius: '4px', border: '1px solid #7dd3fc' }}>
+                        <label style={{fontSize: '0.8rem', fontWeight: 'bold', color: '#0284c7'}}>Weekly Base Amount ($)</label>
+                        <input type="number" step="0.01" value={staffData.fixed_salary_amount} onChange={(e) => setStaffData({...staffData, fixed_salary_amount: e.target.value})} required disabled={isSaving} placeholder="e.g. 1100" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '2px solid #38bdf8', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff', marginTop: '5px' }} />
+                        <p style={{ margin: '5px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>*This amount will be added to their hourly totals.</p>
+                      </div>
+                    )}
+                    
+                    {/* HOURLY RATE SELALU MUNCUL */}
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Wkday ($)</label><input type="number" step="0.01" name="base_rate" value={staffData.base_rate} onChange={(e) => setStaffData({...staffData, base_rate: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sat ($)</label><input type="number" step="0.01" name="rate_sat" value={staffData.rate_sat} onChange={(e) => setStaffData({...staffData, rate_sat: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
@@ -373,15 +369,33 @@ export default function PayrollPage() {
                 </div>
               )}
 
+              {/* MODAL 2: UPDATE STAFF RATES */}
               {activeModal === 'rate' && (
                 <div>
                   <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#e65100' }}>Update Staff Rates</h3>
                   {renderFeedback()}
                   <form onSubmit={handleUpdateRateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <div><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Select Staff</label><select name="employee_id" value={updateRateData.employee_id} onChange={(e) => setUpdateRateData({...updateRateData, employee_id: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
-                      <option value="">-- Select Staff --</option>
-                      {employees.map(emp => (<option key={emp.id} value={emp.id}>{emp.name}</option>))}
-                    </select></div>
+                    <div>
+                      <label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Select Staff</label>
+                      <select name="employee_id" value={updateRateData.employee_id} onChange={(e) => setUpdateRateData({...updateRateData, employee_id: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
+                        <option value="">-- Select Staff --</option>
+                        {employees.map(emp => (<option key={emp.id} value={emp.id}>{emp.name}</option>))}
+                      </select>
+                    </div>
+
+                    <label style={{ fontSize: '0.9em', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#e0f2fe', padding: '10px', borderRadius: '5px', fontWeight: 'bold', color: '#0369a1' }}>
+                      <input type="checkbox" checked={updateRateData.is_fixed_salary} onChange={(e) => setUpdateRateData({...updateRateData, is_fixed_salary: e.target.checked})} disabled={isSaving} />
+                      Add Weekly Base Allowance ($)
+                    </label>
+
+                    {updateRateData.is_fixed_salary && (
+                      <div style={{ background: '#f0f9ff', padding: '10px', borderRadius: '4px', border: '1px solid #7dd3fc' }}>
+                        <label style={{fontSize: '0.8rem', fontWeight: 'bold', color: '#0284c7'}}>Weekly Base Amount ($)</label>
+                        <input type="number" step="0.01" value={updateRateData.fixed_salary_amount} onChange={(e) => setUpdateRateData({...updateRateData, fixed_salary_amount: e.target.value})} required disabled={isSaving} placeholder="e.g. 1100" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '2px solid #38bdf8', borderRadius: '4px', backgroundColor: isSaving ? '#f1f5f9' : '#fff', marginTop: '5px' }} />
+                      </div>
+                    )}
+
+                    {/* HOURLY RATE SELALU MUNCUL */}
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Wkday ($)</label><input type="number" step="0.01" name="base_rate" value={updateRateData.base_rate} onChange={(e) => setUpdateRateData({...updateRateData, base_rate: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sat ($)</label><input type="number" step="0.01" name="rate_sat" value={updateRateData.rate_sat} onChange={(e) => setUpdateRateData({...updateRateData, rate_sat: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
@@ -394,7 +408,7 @@ export default function PayrollPage() {
 
                     <label style={{ fontSize: '0.9em', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#fff3e0', padding: '10px', borderRadius: '5px' }}>
                       <input type="checkbox" checked={isWeeklyOnly} onChange={(e) => setIsWeeklyOnly(e.target.checked)} disabled={isSaving} />
-                      Apply only for the currently selected week
+                      Apply hourly changes ONLY for this current week
                     </label>
                     
                     <button type="submit" disabled={isSaving} style={{ padding: '10px', background: isSaving ? '#94a3b8' : '#e65100', color: '#fff', border: 'none', borderRadius: '4px', cursor: isSaving ? 'not-allowed' : 'pointer', marginTop: '10px', fontWeight: 'bold' }}>
@@ -404,6 +418,7 @@ export default function PayrollPage() {
                 </div>
               )}
 
+              {/* MODAL 3: SHIFT SCHEDULE */}
               {activeModal === 'shift' && (
                 <div>
                   <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#007bff' }}>Input Shift Schedule</h3>
@@ -517,7 +532,18 @@ export default function PayrollPage() {
             <tbody>
               {payrollData.map((staff) => (
                 <tr key={staff.id}>
-                  <td style={{ textAlign: 'left', padding: '6px 4px' }}>{staff.name}</td>
+                  
+                  {/* TAMPILAN NAMA DENGAN BADGE BASE ALLOWANCE */}
+                  <td style={{ textAlign: 'left', padding: '6px 4px', fontWeight: staff.is_fixed_salary ? 'bold' : 'normal', color: staff.is_fixed_salary ? '#0284c7' : '#000' }}>
+                    {staff.name} 
+                    {staff.is_fixed_salary && (
+                      <span style={{fontSize: '0.7rem', background:'#e0f2fe', padding:'2px 4px', borderRadius:'4px', marginLeft:'6px', color:'#0369a1'}}>
+                        + Base {formatMoney(staff.fixed_salary_amount)}
+                      </span>
+                    )}
+                  </td>
+                  
+                  {/* TAMPILAN RATE (Selalu memunculkan rate per-jam normalnya) */}
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_weekday)}</td>
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_sat)}</td>
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_sun)}</td>
@@ -533,7 +559,11 @@ export default function PayrollPage() {
                   <td style={{ padding: '6px 4px', fontWeight: 'bold' }}>{formatMoney(staff.total_weekday)}</td>
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_sat)}</td>
                   <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_sun)}</td>
-                  <td style={{ padding: '6px 4px', fontWeight: 'bold' }}>{formatMoney(staff.grand_total)}</td>
+                  
+                  {/* GRAND TOTAL OTOMATIS SUDAH DITAMBAH BASE ALLOWANCE DARI BACKEND */}
+                  <td style={{ padding: '6px 4px', fontWeight: 'bold', color: staff.is_fixed_salary ? '#e65100' : 'inherit' }}>
+                    {formatMoney(staff.grand_total)}
+                  </td>
                   <td style={{ padding: '6px 4px' }}></td> 
                   <td style={{ padding: '6px 4px' }}></td> 
                 </tr>
@@ -555,7 +585,7 @@ export default function PayrollPage() {
                 <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.weekday)}</td>
                 <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.sat)}</td>
                 <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.sun)}</td>
-                <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.grand)}</td>
+                <td style={{ padding: '8px 4px', color: '#16a34a' }}>{formatMoney(footerTotals.grand)}</td>
                 
                 <td style={{ padding: '4px 0px', textAlign: 'right', paddingRight: '10px' }}>
                   {formatMoney(weeklySales)}
