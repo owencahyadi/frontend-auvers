@@ -143,7 +143,7 @@ export default function PayrollPage() {
     if (isWeeklyOnly) {
       api.put(`/employees/${updateRateData.employee_id}/weekly-rates`, { ...updateRateData, start_date: weekStart })
       .then(() => {
-        setFeedback({ type: 'success', text: 'SPECIAL rate for this week updated successfully!' });
+        setFeedback({ type: 'success', text: 'Rates & Allowances for THIS WEEK updated successfully!' });
         setUpdateRateData({ employee_id: '', is_fixed_salary: false, fixed_salary_amount: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
         setIsWeeklyOnly(false);
         fetchData(); 
@@ -298,27 +298,22 @@ export default function PayrollPage() {
     <div>
       <h1 style={{ marginBottom: '40px' }}>F&B Payroll Dashboard</h1>
       
-      {/* KUMPULAN TOMBOL AKSI DENGAN GRANULAR PERMISSIONS */}
       <div style={{ display: 'flex', gap: '15px', marginBottom: '30px', flexWrap: 'wrap' }}>
-        
         {canAddStaff && (
           <button disabled={loading} onClick={() => { setActiveModal('staff'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
             + Add Employee
           </button>
         )}
-
         {canEditRate && (
           <button disabled={loading} onClick={() => { setActiveModal('rate'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#e65100', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
             $ Update Staff Rates
           </button>
         )}
-
         {canInputShift && (
           <button disabled={loading} onClick={() => { setActiveModal('shift'); setFeedback({type:'', text:''}); }} style={{ padding: '12px 20px', background: loading ? '#94a3b8' : '#007bff', color: '#fff', border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
             📅 Input Shift Roster
           </button>
         )}
-
       </div>
 
       {activeModal && (
@@ -329,7 +324,6 @@ export default function PayrollPage() {
                 disabled={isSaving} 
                 style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: isSaving ? 'not-allowed' : 'pointer', color: '#666' }}>✖</button>
 
-              {/* MODAL 1: ADD NEW EMPLOYEE */}
               {activeModal === 'staff' && (
                 <div>
                   <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#0d47a1' }}>Add New Employee</h3>
@@ -351,7 +345,6 @@ export default function PayrollPage() {
                       </div>
                     )}
                     
-                    {/* HOURLY RATE SELALU MUNCUL */}
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Wkday ($)</label><input type="number" step="0.01" name="base_rate" value={staffData.base_rate} onChange={(e) => setStaffData({...staffData, base_rate: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sat ($)</label><input type="number" step="0.01" name="rate_sat" value={staffData.rate_sat} onChange={(e) => setStaffData({...staffData, rate_sat: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
@@ -369,7 +362,6 @@ export default function PayrollPage() {
                 </div>
               )}
 
-              {/* MODAL 2: UPDATE STAFF RATES */}
               {activeModal === 'rate' && (
                 <div>
                   <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#e65100' }}>Update Staff Rates</h3>
@@ -387,12 +379,7 @@ export default function PayrollPage() {
                       <input 
                         type="checkbox" 
                         checked={updateRateData.is_fixed_salary} 
-                        onChange={(e) => {
-                          setUpdateRateData({...updateRateData, is_fixed_salary: e.target.checked});
-                          if (e.target.checked) {
-                            setIsWeeklyOnly(false); // Paksa matikan "Weekly Only" jika Base Allowance dicentang
-                          }
-                        }} 
+                        onChange={(e) => setUpdateRateData({...updateRateData, is_fixed_salary: e.target.checked})} 
                         disabled={isSaving} 
                       />
                       Add Weekly Base Allowance ($)
@@ -405,7 +392,6 @@ export default function PayrollPage() {
                       </div>
                     )}
 
-                    {/* HOURLY RATE SELALU MUNCUL */}
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Wkday ($)</label><input type="number" step="0.01" name="base_rate" value={updateRateData.base_rate} onChange={(e) => setUpdateRateData({...updateRateData, base_rate: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sat ($)</label><input type="number" step="0.01" name="rate_sat" value={updateRateData.rate_sat} onChange={(e) => setUpdateRateData({...updateRateData, rate_sat: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
@@ -416,9 +402,10 @@ export default function PayrollPage() {
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Max Normal Hrs</label><input type="number" step="1" name="ot_threshold" value={updateRateData.ot_threshold} onChange={(e) => setUpdateRateData({...updateRateData, ot_threshold: e.target.value})} required disabled={isSaving} placeholder="e.g. 38" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     </div>
 
-                    <label style={{ fontSize: '0.9em', cursor: (isSaving || updateRateData.is_fixed_salary) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#fff3e0', padding: '10px', borderRadius: '5px', opacity: updateRateData.is_fixed_salary ? 0.5 : 1 }}>
-                      <input type="checkbox" checked={isWeeklyOnly} onChange={(e) => setIsWeeklyOnly(e.target.checked)} disabled={isSaving || updateRateData.is_fixed_salary} />
-                      Apply hourly changes ONLY for this current week
+                    {/* LOGIKA DIPERBAIKI: Checkbox ini sekarang bisa diklik bersamaan dengan Base Allowance */}
+                    <label style={{ fontSize: '0.9em', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#fff3e0', padding: '10px', borderRadius: '5px' }}>
+                      <input type="checkbox" checked={isWeeklyOnly} onChange={(e) => setIsWeeklyOnly(e.target.checked)} disabled={isSaving} />
+                      Apply changes ONLY for this current week
                     </label>
                     
                     <button type="submit" disabled={isSaving} style={{ padding: '10px', background: isSaving ? '#94a3b8' : '#e65100', color: '#fff', border: 'none', borderRadius: '4px', cursor: isSaving ? 'not-allowed' : 'pointer', marginTop: '10px', fontWeight: 'bold' }}>
@@ -428,7 +415,6 @@ export default function PayrollPage() {
                 </div>
               )}
 
-              {/* MODAL 3: SHIFT SCHEDULE */}
               {activeModal === 'shift' && (
                 <div>
                   <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#007bff' }}>Input Shift Schedule</h3>
