@@ -8,11 +8,10 @@ export default function FoodCostPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', text: '' });
 
-  const [activeTab, setActiveTab] = useState('base_prep'); // 'base_prep' atau 'final_menu'
+  const [activeTab, setActiveTab] = useState('base_prep'); 
   const [activeModal, setActiveModal] = useState(null); 
   const [recipeToDelete, setRecipeToDelete] = useState(null);
 
-  // Form State untuk Add Recipe
   const initialForm = {
     name: '',
     type: 'base_prep',
@@ -20,7 +19,7 @@ export default function FoodCostPage() {
     yield_unit: '',
     sold_price: '',
     ingredients: [
-      { ingredient_type: 'raw_item', item_id: '', quantity: '' } // Baris pertama default
+      { ingredient_type: 'raw_item', item_id: '', quantity: '' } 
     ]
   };
   const [formData, setFormData] = useState(initialForm);
@@ -42,7 +41,6 @@ export default function FoodCostPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- LOGIKA FORM DINAMIS (INGREDIENTS) ---
   const handleAddIngredientRow = () => {
     setFormData(prev => ({
       ...prev,
@@ -61,18 +59,15 @@ export default function FoodCostPage() {
     setFormData(prev => {
       const newIngredients = [...prev.ingredients];
       newIngredients[index][field] = value;
-      // Reset item_id jika tipe diubah agar tidak nyangkut
       if (field === 'ingredient_type') newIngredients[index].item_id = '';
       return { ...prev, ingredients: newIngredients };
     });
   };
 
-  // --- SUBMIT & DELETE ---
   const handleSubmit = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
 
-    // Validasi: Pastikan semua bahan terisi
     const hasEmptyIngredient = formData.ingredients.some(ing => !ing.item_id || !ing.quantity);
     if (hasEmptyIngredient) {
       setFeedback({ type: 'error', text: 'Please fill in all ingredient items and quantities.' });
@@ -108,17 +103,16 @@ export default function FoodCostPage() {
       .finally(() => setIsSaving(false));
   };
 
-  // --- FORMATTER & FILTERING ---
   const formatMoney = (val) => '$ ' + parseFloat(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   const formatMoneyStandard = (val) => '$ ' + parseFloat(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const displayedRecipes = recipes.filter(r => r.type === activeTab);
-  const basePrepsList = recipes.filter(r => r.type === 'base_prep'); // Untuk dropdown sub-recipe
+  const basePrepsList = recipes.filter(r => r.type === 'base_prep'); 
 
   return (
     <div>
       <div style={{ marginBottom: '25px' }}>
-        <h1 style={{ margin: 0, color: '#0f172a' }}>🍔 Food Cost & Recipe Manager</h1>
+        <h1 style={{ marginBottom: '30px', color: '#0f172a' }}>🍔 Food Cost & Recipe Manager</h1>
         <p style={{ margin: '5px 0 0 0', color: '#64748b', fontSize: '0.95rem' }}>
           Build base preparations and final menus to calculate exact Cost of Goods Sold (COGS).
         </p>
@@ -135,13 +129,13 @@ export default function FoodCostPage() {
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 
             onClick={() => setActiveTab('base_prep')}
-            style={{ padding: '10px 20px', fontWeight: 'bold', border: 'none', borderRadius: '6px', cursor: 'pointer', background: activeTab === 'base_prep' ? '#0d47a1' : 'transparent', color: activeTab === 'base_prep' ? '#fff' : '#64748b' }}
+            style={{ padding: '10px 20px', fontWeight: 'bold', border: activeTab === 'base_prep' ? '1px solid #0d47a1' : '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', background: activeTab === 'base_prep' ? '#0d47a1' : '#f8fafc', color: activeTab === 'base_prep' ? '#fff' : '#64748b' }}
           >
             🍳 Base Preps (Sub-Recipes)
           </button>
           <button 
             onClick={() => setActiveTab('final_menu')}
-            style={{ padding: '10px 20px', fontWeight: 'bold', border: 'none', borderRadius: '6px', cursor: 'pointer', background: activeTab === 'final_menu' ? '#16a34a' : 'transparent', color: activeTab === 'final_menu' ? '#fff' : '#64748b' }}
+            style={{ padding: '10px 20px', fontWeight: 'bold', border: activeTab === 'final_menu' ? '1px solid #16a34a' : '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', background: activeTab === 'final_menu' ? '#16a34a' : '#f8fafc', color: activeTab === 'final_menu' ? '#fff' : '#64748b' }}
           >
             🍽️ Final Menus
           </button>
@@ -149,7 +143,7 @@ export default function FoodCostPage() {
         <button 
           disabled={loading || isSaving}
           onClick={() => { setFormData({...initialForm, type: activeTab}); setActiveModal('add'); setFeedback({type:'', text:''}); }}
-          style={{ padding: '10px 20px', background: activeTab === 'base_prep' ? '#0d47a1' : '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', cursor: (loading || isSaving) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
+          style={{ padding: '10px 20px', background: activeTab === 'base_prep' ? '#0d47a1' : '#16a34a', color: '#fff', border: activeTab === 'base_prep' ? '1px solid #082f6b' : '1px solid #14532d', borderRadius: '6px', cursor: (loading || isSaving) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
         >
           + Add {activeTab === 'base_prep' ? 'Base Prep' : 'Final Menu'}
         </button>
@@ -282,7 +276,7 @@ export default function FoodCostPage() {
                     />
 
                     {formData.ingredients.length > 1 && (
-                      <button type="button" disabled={isSaving} onClick={() => handleRemoveIngredientRow(idx)} style={{ background: 'transparent', color: '#ef4444', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✖</button>
+                      <button type="button" disabled={isSaving} onClick={() => handleRemoveIngredientRow(idx)} style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '4px', fontSize: '1.2rem', padding: '4px 8px', cursor: 'pointer' }}>✖</button>
                     )}
                   </div>
                 ))}
@@ -292,7 +286,7 @@ export default function FoodCostPage() {
                 </button>
               </div>
 
-              <button type="submit" disabled={isSaving} style={{ padding: '15px', background: formData.type === 'base_prep' ? '#0d47a1' : '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+              <button type="submit" disabled={isSaving} style={{ padding: '15px', background: formData.type === 'base_prep' ? '#0d47a1' : '#16a34a', color: '#fff', border: formData.type === 'base_prep' ? '1px solid #082f6b' : '1px solid #14532d', borderRadius: '6px', fontSize: '1rem', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
                 {isSaving ? 'Saving Recipe...' : 'Save Recipe'}
               </button>
             </form>
@@ -307,8 +301,8 @@ export default function FoodCostPage() {
             <h3 style={{ margin: 0, color: '#0f172a' }}>Confirm Deletion</h3>
             <p style={{ color: '#64748b', margin: '15px 0 20px 0' }}>Delete <strong>"{recipeToDelete.name}"</strong>?<br/>(This cannot be undone)</p>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setRecipeToDelete(null)} disabled={isSaving} style={{ flex: 1, padding: '9px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Cancel</button>
-              <button onClick={confirmDelete} disabled={isSaving} style={{ flex: 1, padding: '9px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>{isSaving ? 'Deleting...' : 'Yes, Delete'}</button>
+              <button onClick={() => setRecipeToDelete(null)} disabled={isSaving} style={{ flex: 1, padding: '9px', background: '#e2e8f0', color: '#475569', border: '1px solid #94a3b8', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Cancel</button>
+              <button onClick={confirmDelete} disabled={isSaving} style={{ flex: 1, padding: '9px', background: '#ef4444', color: '#fff', border: '1px solid #991b1b', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>{isSaving ? 'Deleting...' : 'Yes, Delete'}</button>
             </div>
           </div>
         </div>
