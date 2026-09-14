@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 
 export default function FoodCostPage() {
@@ -9,18 +9,16 @@ export default function FoodCostPage() {
   const [feedback, setFeedback] = useState({ type: '', text: '' });
 
   const [activeTab, setActiveTab] = useState('base_prep'); 
-  const [activeModal, setActiveModal] = useState(null); 
+  const [activeModal, setActiveModal] = useState(null); // 'add' atau 'edit'
+  const [editingId, setEditingId] = useState(null);
   const [recipeToDelete, setRecipeToDelete] = useState(null);
+  
+  // STATE BARU: Menyimpan ID resep mana saja yang sedang di-expand (dilihat rincian bahannya)
+  const [expandedRows, setExpandedRows] = useState([]);
 
   const initialForm = {
-    name: '',
-    type: 'base_prep',
-    yield_qty: '',
-    yield_unit: '',
-    sold_price: '',
-    ingredients: [
-      { ingredient_type: 'raw_item', item_id: '', quantity: '' } 
-    ]
+    name: '', type: 'base_prep', yield_qty: '', yield_unit: '', sold_price: '',
+    ingredients: [{ ingredient_type: 'raw_item', item_id: '', quantity: '' }]
   };
   const [formData, setFormData] = useState(initialForm);
 
@@ -41,18 +39,18 @@ export default function FoodCostPage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // --- LOGIKA EXPAND ROW ---
+  const toggleRow = (id) => {
+    setExpandedRows(prev => prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]);
+  };
+
+  // --- LOGIKA FORM DINAMIS (INGREDIENTS) ---
   const handleAddIngredientRow = () => {
-    setFormData(prev => ({
-      ...prev,
-      ingredients: [...prev.ingredients, { ingredient_type: 'raw_item', item_id: '', quantity: '' }]
-    }));
+    setFormData(prev => ({ ...prev, ingredients: [...prev.ingredients, { ingredient_type: 'raw_item', item_id: '', quantity: '' }] }));
   };
 
   const handleRemoveIngredientRow = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      ingredients: prev.ingredients.filter((_, i) => i !== index)
-    }));
+    setFormData(prev => ({ ...prev, ingredients: prev.ingredients.filter((_, i) => i !== index) }));
   };
 
   const handleIngredientChange = (index, field, value) => {
@@ -62,6 +60,24 @@ export default function FoodCostPage() {
       if (field === 'ingredient_type') newIngredients[index].item_id = '';
       return { ...prev, ingredients: newIngredients };
     });
+  };
+
+  const handleOpenEdit = (recipe) => {
+    setFormData({
+      name: recipe.name,
+      type: recipe.type,
+      yield_qty: recipe.yield_qty,
+      yield_unit: recipe.yield_unit,
+      sold_price: recipe.sold_price || '',
+      ingredients: recipe.ingredients.map(ing => ({
+        ingredient_type: ing.ingredient_type,
+        item_id: ing.ingredient_type === 'raw_item' ? ing.supplier_item_id : ing.sub_recipe_id,
+        quantity: ing.quantity
+      }))
+    });
+    setEditingId(recipe.id);
+    setActiveModal('edit');
+    setFeedback({ type: '', text: '' });
   };
 
   const handleSubmit = (e) => {
@@ -75,31 +91,25 @@ export default function FoodCostPage() {
     }
 
     setIsSaving(true);
-    api.post('/recipes', formData)
-      .then(res => {
+    const request = editingId 
+      ? api.put(`/recipes/${editingId}`, formData) 
+      : api.post('/recipes', formData);
+
+    request.then(res => {
         setFeedback({ type: 'success', text: res.data.message });
         fetchData();
-        setTimeout(() => setActiveModal(null), 1000);
+        setTimeout(() => { setActiveModal(null); setEditingId(null); }, 1000);
       })
-      .catch(err => {
-        setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to save recipe.' });
-      })
+      .catch(err => setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to save recipe.' }))
       .finally(() => setIsSaving(false));
   };
 
   const confirmDelete = () => {
     if (!recipeToDelete) return;
     setIsSaving(true);
-
     api.delete(`/recipes/${recipeToDelete.id}`)
-      .then(res => {
-        fetchData();
-        setRecipeToDelete(null);
-      })
-      .catch(err => {
-        alert(err.response?.data?.message || 'Failed to delete recipe.');
-        setRecipeToDelete(null);
-      })
+      .then(res => { fetchData(); setRecipeToDelete(null); })
+      .catch(err => { alert(err.response?.data?.message || 'Failed to delete recipe.'); setRecipeToDelete(null); })
       .finally(() => setIsSaving(false));
   };
 
@@ -109,13 +119,20 @@ export default function FoodCostPage() {
   const displayedRecipes = recipes.filter(r => r.type === activeTab);
   const basePrepsList = recipes.filter(r => r.type === 'base_prep'); 
 
+  // Hitung Harga per Bahan secara dinamis untuk ditampilkan di tabel
+  const getIngredientDetails = (ing) => {
+    const isRaw = ing.ingredient_type === 'raw_item';
+    const name = isRaw ? ing.supplier_item?.item_name : ing.sub_recipe?.name;
+    const unit = isRaw ? ing.supplier_item?.measurement : ing.sub_recipe?.yield_unit;
+    const unitCost = isRaw ? parseFloat(ing.supplier_item?.price || 0) : parseFloat(ing.sub_recipe?.cost_per_unit || 0);
+    const totalCost = parseFloat(ing.quantity) * unitCost;
+    return { name, unit, unitCost, totalCost };
+  };
+
   return (
     <div>
       <div style={{ marginBottom: '25px' }}>
         <h1 style={{ marginBottom: '30px', color: '#0f172a' }}>🍔 Food Cost & Recipe Manager</h1>
-        <p style={{ margin: '5px 0 0 0', color: '#64748b', fontSize: '0.95rem' }}>
-          Build base preparations and final menus to calculate exact Cost of Goods Sold (COGS).
-        </p>
       </div>
 
       {feedback.text && (
@@ -142,7 +159,7 @@ export default function FoodCostPage() {
         </div>
         <button 
           disabled={loading || isSaving}
-          onClick={() => { setFormData({...initialForm, type: activeTab}); setActiveModal('add'); setFeedback({type:'', text:''}); }}
+          onClick={() => { setFormData({...initialForm, type: activeTab}); setEditingId(null); setActiveModal('add'); setFeedback({type:'', text:''}); }}
           style={{ padding: '10px 20px', background: activeTab === 'base_prep' ? '#0d47a1' : '#16a34a', color: '#fff', border: activeTab === 'base_prep' ? '1px solid #082f6b' : '1px solid #14532d', borderRadius: '6px', cursor: (loading || isSaving) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
         >
           + Add {activeTab === 'base_prep' ? 'Base Prep' : 'Final Menu'}
@@ -160,7 +177,7 @@ export default function FoodCostPage() {
                 <th style={{ padding: '12px 15px' }}>Total Ingredients Cost</th>
                 
                 {activeTab === 'base_prep' ? (
-                  <th style={{ padding: '12px 15px' }}>Cost Per Unit (ML/GR)</th>
+                  <th style={{ padding: '12px 15px' }}>Cost Per Unit</th>
                 ) : (
                   <>
                     <th style={{ padding: '12px 15px' }}>Sold Price</th>
@@ -172,29 +189,71 @@ export default function FoodCostPage() {
             </thead>
             <tbody>
               {displayedRecipes.length === 0 ? (
-                <tr><td colSpan={activeTab === 'base_prep' ? 5 : 6} style={{ padding: '25px', textAlign: 'center', color: '#94a3b8' }}>No recipes found in this category.</td></tr>
+                <tr><td colSpan="7" style={{ padding: '25px', textAlign: 'center', color: '#94a3b8' }}>No recipes found.</td></tr>
               ) : (
                 displayedRecipes.map((r) => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '12px 15px', fontWeight: 'bold', color: '#0f172a' }}>{r.name}</td>
-                    <td style={{ padding: '12px 15px' }}>{parseFloat(r.yield_qty)} {r.yield_unit.toUpperCase()}</td>
-                    <td style={{ padding: '12px 15px', color: '#d97706', fontWeight: 'bold' }}>{formatMoneyStandard(r.total_cost)}</td>
-                    
-                    {activeTab === 'base_prep' ? (
-                      <td style={{ padding: '12px 15px', color: '#0284c7', fontWeight: 'bold' }}>{formatMoney(r.cost_per_unit)} / {r.yield_unit}</td>
-                    ) : (
-                      <>
-                        <td style={{ padding: '12px 15px', fontWeight: 'bold' }}>{formatMoneyStandard(r.sold_price)}</td>
-                        <td style={{ padding: '12px 15px', fontWeight: 'bold', color: r.cogs_percentage > 35 ? '#dc2626' : '#16a34a' }}>
-                          {parseFloat(r.cogs_percentage).toFixed(2)} %
-                        </td>
-                      </>
-                    )}
+                  <React.Fragment key={r.id}>
+                    {/* BARIS UTAMA (RESEP) */}
+                    <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: expandedRows.includes(r.id) ? '#f8fafc' : '#fff' }}>
+                      <td style={{ padding: '12px 15px', fontWeight: 'bold', color: '#0f172a' }}>{r.name}</td>
+                      <td style={{ padding: '12px 15px' }}>{parseFloat(r.yield_qty)} {r.yield_unit.toUpperCase()}</td>
+                      <td style={{ padding: '12px 15px', color: '#d97706', fontWeight: 'bold' }}>{formatMoneyStandard(r.total_cost)}</td>
+                      
+                      {activeTab === 'base_prep' ? (
+                        <td style={{ padding: '12px 15px', color: '#0284c7', fontWeight: 'bold' }}>{formatMoney(r.cost_per_unit)} / {r.yield_unit}</td>
+                      ) : (
+                        <>
+                          <td style={{ padding: '12px 15px', fontWeight: 'bold' }}>{formatMoneyStandard(r.sold_price)}</td>
+                          <td style={{ padding: '12px 15px', fontWeight: 'bold', color: r.cogs_percentage > 35 ? '#dc2626' : '#16a34a' }}>
+                            {parseFloat(r.cogs_percentage).toFixed(2)} %
+                          </td>
+                        </>
+                      )}
 
-                    <td style={{ padding: '12px 15px', textAlign: 'center' }}>
-                      <button disabled={isSaving} onClick={() => { setRecipeToDelete(r); }} style={{ padding: '6px 12px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>Delete</button>
-                    </td>
-                  </tr>
+                      <td style={{ padding: '12px 15px', textAlign: 'center' }}>
+                        <button onClick={() => toggleRow(r.id)} style={{ padding: '6px 10px', marginRight: '5px', background: '#e2e8f0', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          {expandedRows.includes(r.id) ? '▲ Hide' : '👁️ View'}
+                        </button>
+                        <button disabled={isSaving} onClick={() => handleOpenEdit(r)} style={{ padding: '6px 10px', marginRight: '5px', background: '#fef3c7', color: '#d97706', border: '1px solid #fcd34d', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>Edit</button>
+                        <button disabled={isSaving} onClick={() => setRecipeToDelete(r)} style={{ padding: '6px 10px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>Delete</button>
+                      </td>
+                    </tr>
+
+                    {/* BARIS RINCIAN BAHAN (Hanya muncul jika di-Expand) */}
+                    {expandedRows.includes(r.id) && (
+                      <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan="100%" style={{ padding: '15px 25px' }}>
+                          <h5 style={{ margin: '0 0 10px 0', color: '#475569' }}>🛒 Ingredients Breakdown for {r.name}:</h5>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #cbd5e1', color: '#64748b' }}>
+                                <th style={{ padding: '5px', textAlign: 'left' }}>Item Name</th>
+                                <th style={{ padding: '5px', textAlign: 'right' }}>Qty Used</th>
+                                <th style={{ padding: '5px', textAlign: 'right' }}>Cost / Unit</th>
+                                <th style={{ padding: '5px', textAlign: 'right' }}>Total Cost</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {r.ingredients.map(ing => {
+                                const details = getIngredientDetails(ing);
+                                return (
+                                  <tr key={ing.id} style={{ borderBottom: '1px dotted #cbd5e1' }}>
+                                    <td style={{ padding: '6px 5px', fontWeight: 'bold' }}>
+                                      {details.name || <span style={{ color: 'red' }}>Item Deleted</span>}
+                                      {ing.ingredient_type === 'sub_recipe' && <span style={{ marginLeft: '5px', fontSize: '0.7rem', background: '#e0f2fe', color: '#0284c7', padding: '2px 4px', borderRadius: '4px' }}>Base Prep</span>}
+                                    </td>
+                                    <td style={{ padding: '6px 5px', textAlign: 'right' }}>{parseFloat(ing.quantity)} {details.unit}</td>
+                                    <td style={{ padding: '6px 5px', textAlign: 'right', color: '#64748b' }}>{formatMoney(details.unitCost)}</td>
+                                    <td style={{ padding: '6px 5px', textAlign: 'right', fontWeight: 'bold', color: '#b45309' }}>{formatMoney(details.totalCost)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
@@ -202,19 +261,17 @@ export default function FoodCostPage() {
         )}
       </div>
 
-      {/* MODAL ADD RECIPE BUILDER */}
-      {activeModal === 'add' && (
+      {/* MODAL ADD / EDIT RECIPE */}
+      {(activeModal === 'add' || activeModal === 'edit') && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px', zIndex: 1000 }}>
           <div style={{ background: '#fff', padding: '30px', borderRadius: '12px', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-            <button onClick={() => setActiveModal(null)} disabled={isSaving} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>✖</button>
+            <button onClick={() => {setActiveModal(null); setEditingId(null);}} disabled={isSaving} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>✖</button>
             
             <h2 style={{ marginTop: 0, color: formData.type === 'base_prep' ? '#0d47a1' : '#16a34a', borderBottom: '2px solid #e2e8f0', paddingBottom: '10px', marginBottom: '20px' }}>
-              {formData.type === 'base_prep' ? '🍳 Create Base Prep' : '🍽️ Create Final Menu'}
+              {activeModal === 'edit' ? '✏️ Edit Recipe' : (formData.type === 'base_prep' ? '🍳 Create Base Prep' : '🍽️ Create Final Menu')}
             </h2>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              
-              {/* SECTION 1: HEADER INFO */}
               <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 2, minWidth: '200px' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155' }}>Recipe Name</label>
@@ -237,7 +294,6 @@ export default function FoodCostPage() {
                 </div>
               )}
 
-              {/* SECTION 2: INGREDIENTS BUILDER */}
               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ margin: '0 0 15px 0', color: '#0f172a' }}>Ingredients List</h4>
                 
@@ -287,7 +343,7 @@ export default function FoodCostPage() {
               </div>
 
               <button type="submit" disabled={isSaving} style={{ padding: '15px', background: formData.type === 'base_prep' ? '#0d47a1' : '#16a34a', color: '#fff', border: formData.type === 'base_prep' ? '1px solid #082f6b' : '1px solid #14532d', borderRadius: '6px', fontSize: '1rem', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
-                {isSaving ? 'Saving Recipe...' : 'Save Recipe'}
+                {isSaving ? 'Saving Recipe...' : (activeModal === 'edit' ? 'Update Recipe' : 'Save Recipe')}
               </button>
             </form>
           </div>
