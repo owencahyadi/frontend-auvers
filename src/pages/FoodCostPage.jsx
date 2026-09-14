@@ -15,9 +15,10 @@ export default function FoodCostPage() {
   
   const [expandedRows, setExpandedRows] = useState([]);
 
+  // Struktur State Ingredient diperbarui untuk menampung Kategori dan Filter Nama
   const initialForm = {
     name: '', type: 'base_prep', yield_qty: '', yield_unit: '', sold_price: '',
-    ingredients: [{ ingredient_type: 'raw_item', item_id: '', quantity: '' }]
+    ingredients: [{ ingredient_type: 'raw_item', category: '', filter_item_name: '', item_id: '', quantity: '' }]
   };
   const [formData, setFormData] = useState(initialForm);
 
@@ -43,18 +44,38 @@ export default function FoodCostPage() {
   };
 
   const handleAddIngredientRow = () => {
-    setFormData(prev => ({ ...prev, ingredients: [...prev.ingredients, { ingredient_type: 'raw_item', item_id: '', quantity: '' }] }));
+    setFormData(prev => ({ 
+      ...prev, 
+      ingredients: [...prev.ingredients, { ingredient_type: 'raw_item', category: '', filter_item_name: '', item_id: '', quantity: '' }] 
+    }));
   };
 
   const handleRemoveIngredientRow = (index) => {
-    setFormData(prev => ({ ...prev, ingredients: prev.ingredients.filter((_, i) => i !== index) }));
+    setFormData(prev => ({ 
+      ...prev, 
+      ingredients: prev.ingredients.filter((_, i) => i !== index) 
+    }));
   };
 
   const handleIngredientChange = (index, field, value) => {
     setFormData(prev => {
       const newIngredients = [...prev.ingredients];
       newIngredients[index][field] = value;
-      if (field === 'ingredient_type') newIngredients[index].item_id = '';
+      
+      // Reset dropdown anak jika dropdown induknya berubah
+      if (field === 'ingredient_type') {
+        newIngredients[index].category = '';
+        newIngredients[index].filter_item_name = '';
+        newIngredients[index].item_id = '';
+      }
+      if (field === 'category') {
+        newIngredients[index].filter_item_name = '';
+        newIngredients[index].item_id = '';
+      }
+      if (field === 'filter_item_name') {
+        newIngredients[index].item_id = '';
+      }
+      
       return { ...prev, ingredients: newIngredients };
     });
   };
@@ -66,11 +87,16 @@ export default function FoodCostPage() {
       yield_qty: recipe.yield_qty,
       yield_unit: recipe.yield_unit,
       sold_price: recipe.sold_price || '',
-      ingredients: recipe.ingredients.map(ing => ({
-        ingredient_type: ing.ingredient_type,
-        item_id: ing.ingredient_type === 'raw_item' ? ing.supplier_item_id : ing.sub_recipe_id,
-        quantity: ing.quantity
-      }))
+      ingredients: recipe.ingredients.map(ing => {
+        const isRaw = ing.ingredient_type === 'raw_item';
+        return {
+          ingredient_type: ing.ingredient_type,
+          category: isRaw ? (ing.supplier_item?.category || '') : '',
+          filter_item_name: isRaw ? (ing.supplier_item?.item_name || '') : '',
+          item_id: isRaw ? ing.supplier_item_id : ing.sub_recipe_id,
+          quantity: ing.quantity
+        };
+      })
     });
     setEditingId(recipe.id);
     setActiveModal('edit');
@@ -115,8 +141,8 @@ export default function FoodCostPage() {
 
   const displayedRecipes = recipes.filter(r => r.type === activeTab);
   const basePrepsList = recipes.filter(r => r.type === 'base_prep'); 
+  const uniqueCategories = [...new Set(supplierItems.map(item => item.category))].sort();
 
-  // LOGIKA BARU: Pengekstrak Angka dan Pembagi Harga Unit
   const getIngredientDetails = (ing) => {
     const isRaw = ing.ingredient_type === 'raw_item';
     const name = isRaw ? ing.supplier_item?.item_name : ing.sub_recipe?.name;
@@ -125,12 +151,10 @@ export default function FoodCostPage() {
     let unitCost = 0;
     if (isRaw) {
       const catalogPrice = parseFloat(ing.supplier_item?.price || 0);
-      
-      // Ambil string measurement (contoh: "6000 gr") dan ekstrak angka 6000
       const measurementStr = String(ing.supplier_item?.measurement || '1');
       const match = measurementStr.match(/[\d\.]+/);
       let measurementVal = match ? parseFloat(match[0]) : 1;
-      if (measurementVal <= 0) measurementVal = 1; // Pencegah dibagi 0
+      if (measurementVal <= 0) measurementVal = 1;
       
       unitCost = catalogPrice / measurementVal;
     } else {
@@ -276,7 +300,8 @@ export default function FoodCostPage() {
       {/* MODAL ADD / EDIT RECIPE */}
       {(activeModal === 'add' || activeModal === 'edit') && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px', zIndex: 1000 }}>
-          <div style={{ background: '#fff', padding: '30px', borderRadius: '12px', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+          {/* Modal diperlebar jadi 850px agar isinya tidak tertekan */}
+          <div style={{ background: '#fff', padding: '30px', borderRadius: '12px', width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <button onClick={() => {setActiveModal(null); setEditingId(null);}} disabled={isSaving} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>✖</button>
             
             <h2 style={{ marginTop: 0, color: formData.type === 'base_prep' ? '#0d47a1' : '#16a34a', borderBottom: '2px solid #e2e8f0', paddingBottom: '10px', marginBottom: '20px' }}>
@@ -306,50 +331,81 @@ export default function FoodCostPage() {
                 </div>
               )}
 
+              {/* SECTION 2: INGREDIENTS BUILDER (Diperbarui dengan kotak terpisah per bahan) */}
               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ margin: '0 0 15px 0', color: '#0f172a' }}>Ingredients List</h4>
                 
-                {formData.ingredients.map((ing, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
-                    <select 
-                      disabled={isSaving}
-                      value={ing.ingredient_type} 
-                      onChange={e => handleIngredientChange(idx, 'ingredient_type', e.target.value)}
-                      style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '130px', background: '#fff' }}
-                    >
-                      <option value="raw_item">Raw Supplier</option>
-                      {formData.type === 'final_menu' && <option value="sub_recipe">Base Prep</option>}
-                    </select>
+                {formData.ingredients.map((ing, idx) => {
+                  // Filter logika untuk setiap baris
+                  const ingItemsCat = supplierItems.filter(item => item.category === ing.category);
+                  const uniqueItemNames = [...new Set(ingItemsCat.map(item => item.item_name))].sort();
+                  const availableSuppliers = ingItemsCat.filter(item => item.item_name === ing.filter_item_name);
 
-                    <select 
-                      disabled={isSaving} required
-                      value={ing.item_id} 
-                      onChange={e => handleIngredientChange(idx, 'item_id', e.target.value)}
-                      style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', flex: 1, background: '#fff' }}
-                    >
-                      <option value="">-- Select Item --</option>
-                      {ing.ingredient_type === 'raw_item' ? (
-                        supplierItems.map(item => <option key={item.id} value={item.id}>[{item.category}] {item.item_name} ({item.measurement})</option>)
-                      ) : (
-                        basePrepsList.map(prep => <option key={prep.id} value={prep.id}>{prep.name} (per {prep.yield_unit})</option>)
+                  return (
+                    <div key={idx} style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '12px', marginBottom: '12px', position: 'relative' }}>
+                      
+                      {/* Tombol Delete Baris Bahan */}
+                      {formData.ingredients.length > 1 && (
+                        <button type="button" disabled={isSaving} onClick={() => handleRemoveIngredientRow(idx)} style={{ position: 'absolute', top: '8px', right: '8px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '4px', fontSize: '0.9rem', padding: '2px 8px', cursor: 'pointer', fontWeight: 'bold' }}>✖</button>
                       )}
-                    </select>
 
-                    <input 
-                      type="number" step="0.0001" required disabled={isSaving}
-                      value={ing.quantity} 
-                      onChange={e => handleIngredientChange(idx, 'quantity', e.target.value)}
-                      placeholder="Qty used"
-                      style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '100px' }}
-                    />
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', paddingRight: formData.ingredients.length > 1 ? '35px' : '0' }}>
+                        
+                        <div style={{ flex: '1 1 120px' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Type</label>
+                          <select disabled={isSaving} value={ing.ingredient_type} onChange={e => handleIngredientChange(idx, 'ingredient_type', e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', background: '#f8fafc' }}>
+                            <option value="raw_item">Raw Supplier</option>
+                            {formData.type === 'final_menu' && <option value="sub_recipe">Base Prep</option>}
+                          </select>
+                        </div>
 
-                    {formData.ingredients.length > 1 && (
-                      <button type="button" disabled={isSaving} onClick={() => handleRemoveIngredientRow(idx)} style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '4px', fontSize: '1.2rem', padding: '4px 8px', cursor: 'pointer' }}>✖</button>
-                    )}
-                  </div>
-                ))}
+                        {ing.ingredient_type === 'raw_item' ? (
+                          <>
+                            <div style={{ flex: '1 1 150px' }}>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Category</label>
+                              <select disabled={isSaving} value={ing.category} onChange={e => handleIngredientChange(idx, 'category', e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', background: '#fff' }}>
+                                <option value="">-- Category --</option>
+                                {uniqueCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                              </select>
+                            </div>
 
-                <button type="button" disabled={isSaving} onClick={handleAddIngredientRow} style={{ marginTop: '10px', padding: '8px 15px', background: '#e2e8f0', color: '#0f172a', border: '1px dashed #94a3b8', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}>
+                            <div style={{ flex: '1 1 150px' }}>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Item Name</label>
+                              <select disabled={isSaving || !ing.category} value={ing.filter_item_name} onChange={e => handleIngredientChange(idx, 'filter_item_name', e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', background: (isSaving || !ing.category) ? '#f1f5f9' : '#fff' }}>
+                                <option value="">-- Item Name --</option>
+                                {uniqueItemNames.map(name => <option key={name} value={name}>{name}</option>)}
+                              </select>
+                            </div>
+
+                            <div style={{ flex: '1 1 200px' }}>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Select Supplier</label>
+                              <select disabled={isSaving || !ing.filter_item_name} required value={ing.item_id} onChange={e => handleIngredientChange(idx, 'item_id', e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', background: (isSaving || !ing.filter_item_name) ? '#f1f5f9' : '#fff' }}>
+                                <option value="">-- Supplier --</option>
+                                {availableSuppliers.map(item => <option key={item.id} value={item.id}>{item.supplier_name || 'No Name'} (${parseFloat(item.price).toFixed(2)}/{item.measurement})</option>)}
+                              </select>
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ flex: '3 1 300px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Select Base Prep</label>
+                            <select disabled={isSaving} required value={ing.item_id} onChange={e => handleIngredientChange(idx, 'item_id', e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', background: '#fff' }}>
+                              <option value="">-- Select Base Prep --</option>
+                              {basePrepsList.map(prep => <option key={prep.id} value={prep.id}>{prep.name} (per {prep.yield_unit})</option>)}
+                            </select>
+                          </div>
+                        )}
+
+                        <div style={{ flex: '0 1 100px' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Qty Used</label>
+                          <input type="number" step="0.0001" required disabled={isSaving} value={ing.quantity} onChange={e => handleIngredientChange(idx, 'quantity', e.target.value)} placeholder="Qty" style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }} />
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <button type="button" disabled={isSaving} onClick={handleAddIngredientRow} style={{ marginTop: '5px', padding: '10px 15px', background: '#e2e8f0', color: '#0f172a', border: '1px dashed #94a3b8', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}>
                   + Add Another Ingredient
                 </button>
               </div>
