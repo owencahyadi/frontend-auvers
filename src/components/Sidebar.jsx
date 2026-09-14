@@ -131,6 +131,12 @@ export default function Sidebar() {
             </NavLink>
           )}
 
+          {(isAdmin || myPermissions.includes('food_cost')) && (
+            <NavLink to="/food-cost" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              🍔 Food Cost & Recipe
+            </NavLink>
+          )}
+
           {(isAdmin || myPermissions.includes('profit_loss')) && (
             <NavLink to="/pl" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
               📊 P&L

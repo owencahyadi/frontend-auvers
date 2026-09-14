@@ -9,6 +9,7 @@ const AVAILABLE_PAGES = [
   { id: 'operational_costs', label: '⚡ Operational Costs' },
   { id: 'calendar', label: '📅 View Schedule' },
   { id: 'operational_notes', label: '📋 View Operational Notes' },
+  { id: 'food_cost', label: '🍔 View Food Cost & Recipes' },
   
   // -- GRUP PAYROLL & ROSTER --
   { id: 'roster_payroll', label: '📅 VIEW: Roster & Payroll Page' },
