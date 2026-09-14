@@ -9,11 +9,10 @@ export default function FoodCostPage() {
   const [feedback, setFeedback] = useState({ type: '', text: '' });
 
   const [activeTab, setActiveTab] = useState('base_prep'); 
-  const [activeModal, setActiveModal] = useState(null); // 'add' atau 'edit'
+  const [activeModal, setActiveModal] = useState(null); 
   const [editingId, setEditingId] = useState(null);
   const [recipeToDelete, setRecipeToDelete] = useState(null);
   
-  // STATE BARU: Menyimpan ID resep mana saja yang sedang di-expand (dilihat rincian bahannya)
   const [expandedRows, setExpandedRows] = useState([]);
 
   const initialForm = {
@@ -39,12 +38,10 @@ export default function FoodCostPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- LOGIKA EXPAND ROW ---
   const toggleRow = (id) => {
     setExpandedRows(prev => prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]);
   };
 
-  // --- LOGIKA FORM DINAMIS (INGREDIENTS) ---
   const handleAddIngredientRow = () => {
     setFormData(prev => ({ ...prev, ingredients: [...prev.ingredients, { ingredient_type: 'raw_item', item_id: '', quantity: '' }] }));
   };
@@ -119,13 +116,28 @@ export default function FoodCostPage() {
   const displayedRecipes = recipes.filter(r => r.type === activeTab);
   const basePrepsList = recipes.filter(r => r.type === 'base_prep'); 
 
-  // Hitung Harga per Bahan secara dinamis untuk ditampilkan di tabel
+  // LOGIKA BARU: Pengekstrak Angka dan Pembagi Harga Unit
   const getIngredientDetails = (ing) => {
     const isRaw = ing.ingredient_type === 'raw_item';
     const name = isRaw ? ing.supplier_item?.item_name : ing.sub_recipe?.name;
     const unit = isRaw ? ing.supplier_item?.measurement : ing.sub_recipe?.yield_unit;
-    const unitCost = isRaw ? parseFloat(ing.supplier_item?.price || 0) : parseFloat(ing.sub_recipe?.cost_per_unit || 0);
-    const totalCost = parseFloat(ing.quantity) * unitCost;
+    
+    let unitCost = 0;
+    if (isRaw) {
+      const catalogPrice = parseFloat(ing.supplier_item?.price || 0);
+      
+      // Ambil string measurement (contoh: "6000 gr") dan ekstrak angka 6000
+      const measurementStr = String(ing.supplier_item?.measurement || '1');
+      const match = measurementStr.match(/[\d\.]+/);
+      let measurementVal = match ? parseFloat(match[0]) : 1;
+      if (measurementVal <= 0) measurementVal = 1; // Pencegah dibagi 0
+      
+      unitCost = catalogPrice / measurementVal;
+    } else {
+      unitCost = parseFloat(ing.sub_recipe?.cost_per_unit || 0);
+    }
+
+    const totalCost = parseFloat(ing.quantity || 0) * unitCost;
     return { name, unit, unitCost, totalCost };
   };
 
@@ -219,7 +231,7 @@ export default function FoodCostPage() {
                       </td>
                     </tr>
 
-                    {/* BARIS RINCIAN BAHAN (Hanya muncul jika di-Expand) */}
+                    {/* BARIS RINCIAN BAHAN */}
                     {expandedRows.includes(r.id) && (
                       <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
                         <td colSpan="100%" style={{ padding: '15px 25px' }}>
@@ -242,7 +254,7 @@ export default function FoodCostPage() {
                                       {details.name || <span style={{ color: 'red' }}>Item Deleted</span>}
                                       {ing.ingredient_type === 'sub_recipe' && <span style={{ marginLeft: '5px', fontSize: '0.7rem', background: '#e0f2fe', color: '#0284c7', padding: '2px 4px', borderRadius: '4px' }}>Base Prep</span>}
                                     </td>
-                                    <td style={{ padding: '6px 5px', textAlign: 'right' }}>{parseFloat(ing.quantity)} {details.unit}</td>
+                                    <td style={{ padding: '6px 5px', textAlign: 'right' }}>{parseFloat(ing.quantity)} {details.unit?.replace(/[0-9.]/g, '').trim()}</td>
                                     <td style={{ padding: '6px 5px', textAlign: 'right', color: '#64748b' }}>{formatMoney(details.unitCost)}</td>
                                     <td style={{ padding: '6px 5px', textAlign: 'right', fontWeight: 'bold', color: '#b45309' }}>{formatMoney(details.totalCost)}</td>
                                   </tr>
