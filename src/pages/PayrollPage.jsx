@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 export default function PayrollPage() {
   const [weeklySales, setWeeklySales] = useState(0); 
@@ -25,6 +27,9 @@ export default function PayrollPage() {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // REFERENSI UNTUK MENCETAK TABEL KE PDF
+  const tableRef = useRef(null);
 
   const currentUser = JSON.parse(localStorage.getItem('user')) || {};
   const isSuperAdmin = currentUser.role === 'admin';
@@ -135,7 +140,6 @@ export default function PayrollPage() {
         base_rate: empPayroll.rate_weekday || '',
         rate_sat: empPayroll.rate_sat || '',
         rate_sun: empPayroll.rate_sun || '',
-        // LOGIKA BARU: OT Rate sekarang ikut terisi otomatis dari backend!
         overtime_rate: empPayroll.overtime_rate || '', 
         ot_threshold: empPayroll.ot_threshold || '38'
       });
@@ -304,6 +308,33 @@ export default function PayrollPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, `Payroll_${weekStart}`);
     
     XLSX.writeFile(workbook, `Payroll_Report_Week_${weekStart}.xlsx`);
+  };
+
+  // --- FUNGSI DOWNLOAD PDF ---
+  const handleDownloadPDF = () => {
+    const input = tableRef.current;
+    if (!input) return;
+
+    // Modifikasi style sementara agar tabel tidak terpotong (overflow)
+    const originalOverflowX = input.style.overflowX;
+    input.style.overflowX = 'visible'; 
+    input.style.width = 'max-content';
+
+    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Menggunakan orientasi L (Landscape), ukuran kertas A4
+      const pdf = new jsPDF('l', 'mm', 'a4'); 
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
+      pdf.save(`Payroll_Report_Week_${weekStart}.pdf`);
+
+      // Mengembalikan style seperti semula
+      input.style.overflowX = originalOverflowX || 'auto';
+      input.style.width = '100%';
+    });
   };
 
   const renderFeedback = () => {
@@ -516,16 +547,26 @@ export default function PayrollPage() {
       )}
 
       {/* PIVOT REPORT TABLE */}
-      <div style={{ overflowX: 'auto', background: '#fff', border: '1px solid #ddd', padding: '15px', borderRadius: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+      <div style={{ background: '#fff', border: '1px solid #ddd', padding: '15px', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '15px' }}>
           <h3 style={{ margin: 0 }}>Roster & Payroll Report</h3>
-          <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            
             <button 
               onClick={handleDownloadExcel} 
               disabled={loading} 
-              style={{ padding: '8px 15px', background: loading ? '#94a3b8' : '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+              style={{ padding: '8px 15px', background: loading ? '#94a3b8' : '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
               📥 Download Excel
             </button>
+
+            {/* TOMBOL DOWNLOAD PDF BARU */}
+            <button 
+              onClick={handleDownloadPDF} 
+              disabled={loading} 
+              style={{ padding: '8px 15px', background: loading ? '#94a3b8' : '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              📥 Download PDF
+            </button>
+
             <div style={{ background: '#e3f2fd', padding: '10px', borderRadius: '5px', display: 'flex', alignItems: 'center' }}>
               <label style={{ fontWeight: 'bold', marginRight: '10px' }}>Select Week Start (Monday):</label>
               <input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} disabled={loading} style={{ padding: '5px', fontSize: '1rem', cursor: loading ? 'not-allowed' : 'pointer', border: '1px solid #90caf9', borderRadius: '4px', backgroundColor: loading ? '#f1f5f9' : '#fff' }} />
@@ -533,97 +574,100 @@ export default function PayrollPage() {
           </div>
         </div>
 
-        {loading ? <p style={{ padding: '20px', textAlign: 'center' }}>Loading payroll data...</p> : (
-          <table border="1" style={{ width: '100%', textAlign: 'right', borderCollapse: 'collapse', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-            <thead style={{ backgroundColor: '#fdfdfd' }}>
-              <tr>
-                <th style={{ textAlign: 'left', padding: '6px 4px' }}>Name</th>
-                <th style={{ padding: '6px 4px' }}>Wkday Rate</th>
-                <th style={{ padding: '6px 4px' }}>Sat Rate</th>
-                <th style={{ padding: '6px 4px' }}>Sun Rate</th>
-                
-                <th style={{ padding: '6px 4px', backgroundColor: '#fff3e0' }}>Sun</th>
-                <th style={{ padding: '6px 4px', backgroundColor: '#e3f2fd' }}>Sat</th>
-                <th style={{ padding: '6px 4px' }}>Fri</th>
-                <th style={{ padding: '6px 4px' }}>Thu</th>
-                <th style={{ padding: '6px 4px' }}>Wed</th>
-                <th style={{ padding: '6px 4px' }}>Tue</th>
-                <th style={{ padding: '6px 4px' }}>Mon</th>
-                
-                <th style={{ padding: '6px 4px' }}>Total Wkday</th>
-                <th style={{ padding: '6px 4px' }}>Total Sat</th>
-                <th style={{ padding: '6px 4px' }}>Total Sun</th>
-                <th style={{ padding: '6px 4px' }}>Grand Total</th>
-                <th style={{ padding: '6px 4px', width: '80px' }}>Sales</th>
-                <th style={{ padding: '6px 4px', width: '40px' }}>%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payrollData.map((staff) => (
-                <tr key={staff.id}>
+        {/* CONTAINER TABEL YANG DITARGETKAN OLEH PDF */}
+        <div ref={tableRef} style={{ overflowX: 'auto', width: '100%', backgroundColor: '#fff' }}>
+          {loading ? <p style={{ padding: '20px', textAlign: 'center' }}>Loading payroll data...</p> : (
+            <table border="1" style={{ width: '100%', textAlign: 'right', borderCollapse: 'collapse', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+              <thead style={{ backgroundColor: '#fdfdfd' }}>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '6px 4px' }}>Name</th>
+                  <th style={{ padding: '6px 4px' }}>Wkday Rate</th>
+                  <th style={{ padding: '6px 4px' }}>Sat Rate</th>
+                  <th style={{ padding: '6px 4px' }}>Sun Rate</th>
                   
-                  <td style={{ textAlign: 'left', padding: '6px 4px', fontWeight: staff.is_fixed_salary ? 'bold' : 'normal', color: staff.is_fixed_salary ? '#0284c7' : '#000' }}>
-                    {staff.name} 
-                    {staff.is_fixed_salary && (
-                      <span style={{fontSize: '0.7rem', background:'#e0f2fe', padding:'2px 4px', borderRadius:'4px', marginLeft:'6px', color:'#0369a1'}}>
-                        + Base {formatMoney(staff.fixed_salary_amount)}
-                      </span>
-                    )}
-                  </td>
+                  <th style={{ padding: '6px 4px', backgroundColor: '#fff3e0' }}>Sun</th>
+                  <th style={{ padding: '6px 4px', backgroundColor: '#e3f2fd' }}>Sat</th>
+                  <th style={{ padding: '6px 4px' }}>Fri</th>
+                  <th style={{ padding: '6px 4px' }}>Thu</th>
+                  <th style={{ padding: '6px 4px' }}>Wed</th>
+                  <th style={{ padding: '6px 4px' }}>Tue</th>
+                  <th style={{ padding: '6px 4px' }}>Mon</th>
                   
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_weekday)}</td>
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_sat)}</td>
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_sun)}</td>
-                  
-                  <td style={{ padding: '6px 4px', backgroundColor: '#fff3e0' }}>{formatMoney(staff.pay_sun)}</td>
-                  <td style={{ padding: '6px 4px', backgroundColor: '#e3f2fd' }}>{formatMoney(staff.pay_sat)}</td>
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_fri)}</td>
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_thu)}</td>
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_wed)}</td>
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_tue)}</td>
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_mon)}</td>
-                  
-                  <td style={{ padding: '6px 4px', fontWeight: 'bold' }}>{formatMoney(staff.total_weekday)}</td>
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_sat)}</td>
-                  <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_sun)}</td>
-                  
-                  <td style={{ padding: '6px 4px', fontWeight: 'bold', color: staff.is_fixed_salary ? '#e65100' : 'inherit' }}>
-                    {formatMoney(staff.grand_total)}
-                  </td>
-                  <td style={{ padding: '6px 4px' }}></td> 
-                  <td style={{ padding: '6px 4px' }}></td> 
+                  <th style={{ padding: '6px 4px' }}>Total Wkday</th>
+                  <th style={{ padding: '6px 4px' }}>Total Sat</th>
+                  <th style={{ padding: '6px 4px' }}>Total Sun</th>
+                  <th style={{ padding: '6px 4px' }}>Grand Total</th>
+                  <th style={{ padding: '6px 4px', width: '80px' }}>Sales</th>
+                  <th style={{ padding: '6px 4px', width: '40px' }}>%</th>
                 </tr>
-              ))}
-            </tbody>
-            
-            <tfoot style={{ backgroundColor: '#f9f9f9', fontWeight: 'bold' }}>
-              <tr>
-                <td colSpan="4" style={{ textAlign: 'center', padding: '10px 4px' }}>Grand Total</td>
-                
-                <td style={{ padding: '8px 4px', backgroundColor: '#fff3e0' }}>{formatMoney(footerTotals.sun)}</td>
-                <td style={{ padding: '8px 4px', backgroundColor: '#e3f2fd' }}>{formatMoney(footerTotals.sat)}</td>
-                <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.fri)}</td>
-                <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.thu)}</td>
-                <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.wed)}</td>
-                <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.tue)}</td>
-                <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.mon)}</td>
-                
-                <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.weekday)}</td>
-                <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.sat)}</td>
-                <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.sun)}</td>
-                <td style={{ padding: '8px 4px', color: '#16a34a' }}>{formatMoney(footerTotals.grand)}</td>
-                
-                <td style={{ padding: '4px 0px', textAlign: 'right', paddingRight: '10px' }}>
-                  {formatMoney(weeklySales)}
-                </td> 
-                
-                <td style={{ padding: '8px 4px', textAlign: 'center', color: (weeklySales > 0 && ((footerTotals.grand / weeklySales) * 100) > 20) ? 'red' : 'green' }}>
-                  {weeklySales > 0 ? ((footerTotals.grand / weeklySales) * 100).toFixed(2) : 0}%
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {payrollData.map((staff) => (
+                  <tr key={staff.id}>
+                    
+                    <td style={{ textAlign: 'left', padding: '6px 4px', fontWeight: staff.is_fixed_salary ? 'bold' : 'normal', color: staff.is_fixed_salary ? '#0284c7' : '#000' }}>
+                      {staff.name} 
+                      {staff.is_fixed_salary && (
+                        <span style={{fontSize: '0.7rem', background:'#e0f2fe', padding:'2px 4px', borderRadius:'4px', marginLeft:'6px', color:'#0369a1'}}>
+                          + Base {formatMoney(staff.fixed_salary_amount)}
+                        </span>
+                      )}
+                    </td>
+                    
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_weekday)}</td>
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_sat)}</td>
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.rate_sun)}</td>
+                    
+                    <td style={{ padding: '6px 4px', backgroundColor: '#fff3e0' }}>{formatMoney(staff.pay_sun)}</td>
+                    <td style={{ padding: '6px 4px', backgroundColor: '#e3f2fd' }}>{formatMoney(staff.pay_sat)}</td>
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_fri)}</td>
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_thu)}</td>
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_wed)}</td>
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_tue)}</td>
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_mon)}</td>
+                    
+                    <td style={{ padding: '6px 4px', fontWeight: 'bold' }}>{formatMoney(staff.total_weekday)}</td>
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_sat)}</td>
+                    <td style={{ padding: '6px 4px' }}>{formatMoney(staff.pay_sun)}</td>
+                    
+                    <td style={{ padding: '6px 4px', fontWeight: 'bold', color: staff.is_fixed_salary ? '#e65100' : 'inherit' }}>
+                      {formatMoney(staff.grand_total)}
+                    </td>
+                    <td style={{ padding: '6px 4px' }}></td> 
+                    <td style={{ padding: '6px 4px' }}></td> 
+                  </tr>
+                ))}
+              </tbody>
+              
+              <tfoot style={{ backgroundColor: '#f9f9f9', fontWeight: 'bold' }}>
+                <tr>
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '10px 4px' }}>Grand Total</td>
+                  
+                  <td style={{ padding: '8px 4px', backgroundColor: '#fff3e0' }}>{formatMoney(footerTotals.sun)}</td>
+                  <td style={{ padding: '8px 4px', backgroundColor: '#e3f2fd' }}>{formatMoney(footerTotals.sat)}</td>
+                  <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.fri)}</td>
+                  <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.thu)}</td>
+                  <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.wed)}</td>
+                  <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.tue)}</td>
+                  <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.mon)}</td>
+                  
+                  <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.weekday)}</td>
+                  <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.sat)}</td>
+                  <td style={{ padding: '8px 4px' }}>{formatMoney(footerTotals.sun)}</td>
+                  <td style={{ padding: '8px 4px', color: '#16a34a' }}>{formatMoney(footerTotals.grand)}</td>
+                  
+                  <td style={{ padding: '4px 0px', textAlign: 'right', paddingRight: '10px' }}>
+                    {formatMoney(weeklySales)}
+                  </td> 
+                  
+                  <td style={{ padding: '8px 4px', textAlign: 'center', color: (weeklySales > 0 && ((footerTotals.grand / weeklySales) * 100) > 20) ? 'red' : 'green' }}>
+                    {weeklySales > 0 ? ((footerTotals.grand / weeklySales) * 100).toFixed(2) : 0}%
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );
