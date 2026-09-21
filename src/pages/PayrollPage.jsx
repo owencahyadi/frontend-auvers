@@ -117,17 +117,14 @@ export default function PayrollPage() {
     setFeedback({ type: '', text: '' }); 
   };
 
-  // --- LOGIKA BARU: Auto-fill Form Update Rate saat Karyawan Dipilih ---
   const handleRateEmployeeChange = (e) => {
     const empId = e.target.value;
     
-    // Jika user mengembalikan ke "-- Select Staff --"
     if (!empId) {
       setUpdateRateData({ employee_id: '', is_fixed_salary: false, fixed_salary_amount: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
       return;
     }
 
-    // Cari data karyawan tersebut dari tabel payroll yang sudah diload
     const empPayroll = payrollData.find(p => p.id == empId);
     
     if (empPayroll) {
@@ -138,7 +135,8 @@ export default function PayrollPage() {
         base_rate: empPayroll.rate_weekday || '',
         rate_sat: empPayroll.rate_sat || '',
         rate_sun: empPayroll.rate_sun || '',
-        overtime_rate: '', // Tidak ada di data tabel, jadi dikosongkan agar diisi manual
+        // LOGIKA BARU: OT Rate sekarang ikut terisi otomatis dari backend!
+        overtime_rate: empPayroll.overtime_rate || '', 
         ot_threshold: empPayroll.ot_threshold || '38'
       });
     } else {
@@ -398,8 +396,6 @@ export default function PayrollPage() {
                   <form onSubmit={handleUpdateRateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     <div>
                       <label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Select Staff</label>
-                      
-                      {/* INI BAGIAN YANG BERUBAH: Memanggil handleRateEmployeeChange saat dropdown diklik */}
                       <select 
                         name="employee_id" 
                         value={updateRateData.employee_id} 
