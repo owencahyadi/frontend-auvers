@@ -1,12 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../utils/api'; 
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 export default function ProfitLossPage() {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', text: '' });
   const [selectedMonth, setSelectedMonth] = useState('2026-06');
+
+  // REFERENSI UNTUK MENCETAK TABEL KE PDF
+  const tableRef = useRef(null);
 
   // --- GET USER ROLE FOR PERMISSION CHECK ---
   const userStr = localStorage.getItem('user');
@@ -159,19 +164,55 @@ export default function ProfitLossPage() {
     XLSX.writeFile(workbook, `P&L_Report_${selectedMonth}.xlsx`);
   };
 
+  // --- FUNGSI DOWNLOAD PDF ---
+  const handleDownloadPDF = () => {
+    const input = tableRef.current;
+    if (!input) return;
+
+    // Modifikasi style sementara agar tabel tidak terpotong (overflow)
+    const originalOverflowX = input.style.overflowX;
+    input.style.overflowX = 'visible'; 
+    input.style.width = 'max-content';
+
+    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Menggunakan orientasi L (Landscape), ukuran kertas A4
+      const pdf = new jsPDF('l', 'mm', 'a4'); 
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
+      pdf.save(`P&L_Report_${selectedMonth}.pdf`);
+
+      // Mengembalikan style seperti semula
+      input.style.overflowX = originalOverflowX || 'auto';
+      input.style.width = '100%';
+    });
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <h1 style={{ margin: '0 0 20px 0', color: '#0f172a' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '15px' }}>
+        <h1 style={{ margin: '0', color: '#0f172a' }}>
           📊 Monthly Profit & Loss Report
         </h1>
         
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button 
             onClick={handleDownloadExcel}
-            style={{ padding: '10px 20px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+            disabled={loading}
+            style={{ padding: '10px 20px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
           >
             📥 Download Excel
+          </button>
+
+          <button 
+            onClick={handleDownloadPDF} 
+            disabled={loading} 
+            style={{ padding: '10px 20px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
+          >
+            📥 Download PDF
           </button>
 
           {/* ADMIN ONLY: SAVE SALES DATA BUTTON */}
@@ -198,11 +239,13 @@ export default function ProfitLossPage() {
           type="month" 
           value={selectedMonth} 
           onChange={e => setSelectedMonth(e.target.value)} 
+          disabled={loading}
           style={{ padding: '8px', fontSize: '1rem', border: '1px solid #ccc', borderRadius: '4px' }} 
         />
         <button 
           onClick={fetchMonthlyReport}
-          style={{ padding: '8px 15px', background: '#0d47a1', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+          disabled={loading}
+          style={{ padding: '8px 15px', background: loading ? '#9ca3af' : '#0d47a1', color: '#fff', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
         >
           Refresh Data
         </button>
@@ -214,8 +257,8 @@ export default function ProfitLossPage() {
         </div>
       )}
 
-      {/* P&L TABLE */}
-      <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', overflowX: 'auto' }}>
+      {/* P&L TABLE (DENGAN REF UNTUK PDF) */}
+      <div ref={tableRef} style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', overflowX: 'auto', width: '100%' }}>
         {loading ? (
           <p style={{ padding: '20px', textAlign: 'center' }}>Loading data...</p>
         ) : !reportData || !reportData.weeks ? (
