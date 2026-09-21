@@ -152,7 +152,17 @@ export default function PayrollPage() {
     setFeedback({ type: '', text: '' });
     setIsSaving(true); 
 
-    api.post('/employees', staffData).then(() => {
+    // Konversi string kosong menjadi 0
+    const payload = {
+      ...staffData,
+      fixed_salary_amount: staffData.fixed_salary_amount === '' ? 0 : staffData.fixed_salary_amount,
+      base_rate: staffData.base_rate === '' ? 0 : staffData.base_rate,
+      rate_sat: staffData.rate_sat === '' ? 0 : staffData.rate_sat,
+      rate_sun: staffData.rate_sun === '' ? 0 : staffData.rate_sun,
+      overtime_rate: staffData.overtime_rate === '' ? 0 : staffData.overtime_rate,
+    };
+
+    api.post('/employees', payload).then(() => {
       setFeedback({ type: 'success', text: 'New employee successfully added!' });
       setStaffData({ name: '', position: '', is_fixed_salary: false, fixed_salary_amount: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
       fetchData();
@@ -170,8 +180,18 @@ export default function PayrollPage() {
     setFeedback({ type: '', text: '' });
     setIsSaving(true); 
     
+    // --- LOGIKA PERBAIKAN: Konversi string kosong menjadi 0 ---
+    const payload = {
+      ...updateRateData,
+      fixed_salary_amount: updateRateData.fixed_salary_amount === '' ? 0 : updateRateData.fixed_salary_amount,
+      base_rate: updateRateData.base_rate === '' ? 0 : updateRateData.base_rate,
+      rate_sat: updateRateData.rate_sat === '' ? 0 : updateRateData.rate_sat,
+      rate_sun: updateRateData.rate_sun === '' ? 0 : updateRateData.rate_sun,
+      overtime_rate: updateRateData.overtime_rate === '' ? 0 : updateRateData.overtime_rate,
+    };
+
     if (isWeeklyOnly) {
-      api.put(`/employees/${updateRateData.employee_id}/weekly-rates`, { ...updateRateData, start_date: weekStart })
+      api.put(`/employees/${payload.employee_id}/weekly-rates`, { ...payload, start_date: weekStart })
       .then(() => {
         setFeedback({ type: 'success', text: 'Rates & Allowances for THIS WEEK updated successfully!' });
         setUpdateRateData({ employee_id: '', is_fixed_salary: false, fixed_salary_amount: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
@@ -181,7 +201,7 @@ export default function PayrollPage() {
         setFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to update special rate.' });
       }).finally(() => setIsSaving(false)); 
     } else {
-      api.put(`/employees/${updateRateData.employee_id}/rates`, updateRateData)
+      api.put(`/employees/${payload.employee_id}/rates`, payload)
       .then(() => {
         setFeedback({ type: 'success', text: 'Master Rate updated permanently!' });
         setUpdateRateData({ employee_id: '', is_fixed_salary: false, fixed_salary_amount: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
@@ -209,7 +229,6 @@ export default function PayrollPage() {
     }).finally(() => setIsSaving(false)); 
   };
 
-  // --- LOGIKA BARU: Otomatis memindahkan tabel ke hari Senin dari tanggal Shift yang dipilih ---
   const handleShiftChange = (e) => {
     const { name, value } = e.target;
     if (name === 'date') {
@@ -218,7 +237,6 @@ export default function PayrollPage() {
       if (value) {
         const d = new Date(value);
         const day = d.getDay();
-        // Cari selisih hari untuk mendapatkan hari Senin (Monday)
         const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
         const monday = new Date(d.setDate(diff));
         
@@ -227,7 +245,6 @@ export default function PayrollPage() {
         const dateStr = String(monday.getDate()).padStart(2, '0');
         const mondayStr = `${year}-${month}-${dateStr}`;
         
-        // Update tabel di belakang modal agar melompat ke minggu yang sesuai
         setWeekStart(mondayStr);
       }
     }
@@ -571,7 +588,6 @@ export default function PayrollPage() {
               📥 Download Excel
             </button>
 
-            {/* TOMBOL DOWNLOAD PDF BARU */}
             <button 
               onClick={handleDownloadPDF} 
               disabled={loading} 
