@@ -4,13 +4,34 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 export default function CalendarPage() {
-  const [weekStart, setWeekStart] = useState('2026-06-22');
+  // MENGAMBIL TANGGAL DARI PAYROLL ATAU MONDAY MINGGU INI
+  const [weekStart, setWeekStart] = useState(() => {
+    const savedDate = localStorage.getItem('payroll_week_start');
+    if (savedDate) return savedDate;
+
+    // Jika belum ada data tersimpan, cari hari Senin minggu ini
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+    const monday = new Date(d.setDate(diff));
+    
+    const year = monday.getFullYear();
+    const month = String(monday.getMonth() + 1).padStart(2, '0');
+    const date = String(monday.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${date}`;
+  });
+
   const [employees, setEmployees] = useState([]);
   const [rosters, setRosters] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Menambahkan useRef untuk menargetkan elemen tabel yang akan di-PDF-kan
   const tableRef = useRef(null);
+
+  // SINKRONISASI: Simpan kembali ke localStorage jika user mengubah tanggal dari kalender
+  useEffect(() => {
+    localStorage.setItem('payroll_week_start', weekStart);
+  }, [weekStart]);
 
   useEffect(() => {
     setLoading(true);
