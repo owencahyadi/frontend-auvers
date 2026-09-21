@@ -28,7 +28,6 @@ export default function PayrollPage() {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // REFERENSI UNTUK MENCETAK TABEL KE PDF
   const tableRef = useRef(null);
 
   const currentUser = JSON.parse(localStorage.getItem('user')) || {};
@@ -210,10 +209,27 @@ export default function PayrollPage() {
     }).finally(() => setIsSaving(false)); 
   };
 
+  // --- LOGIKA BARU: Otomatis memindahkan tabel ke hari Senin dari tanggal Shift yang dipilih ---
   const handleShiftChange = (e) => {
     const { name, value } = e.target;
     if (name === 'date') {
       localStorage.setItem('last_shift_date', value);
+      
+      if (value) {
+        const d = new Date(value);
+        const day = d.getDay();
+        // Cari selisih hari untuk mendapatkan hari Senin (Monday)
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+        const monday = new Date(d.setDate(diff));
+        
+        const year = monday.getFullYear();
+        const month = String(monday.getMonth() + 1).padStart(2, '0');
+        const dateStr = String(monday.getDate()).padStart(2, '0');
+        const mondayStr = `${year}-${month}-${dateStr}`;
+        
+        // Update tabel di belakang modal agar melompat ke minggu yang sesuai
+        setWeekStart(mondayStr);
+      }
     }
     setShiftData({ ...shiftData, [name]: value });
   };
@@ -310,12 +326,10 @@ export default function PayrollPage() {
     XLSX.writeFile(workbook, `Payroll_Report_Week_${weekStart}.xlsx`);
   };
 
-  // --- FUNGSI DOWNLOAD PDF ---
   const handleDownloadPDF = () => {
     const input = tableRef.current;
     if (!input) return;
 
-    // Modifikasi style sementara agar tabel tidak terpotong (overflow)
     const originalOverflowX = input.style.overflowX;
     input.style.overflowX = 'visible'; 
     input.style.width = 'max-content';
@@ -323,7 +337,6 @@ export default function PayrollPage() {
     html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
       const imgData = canvas.toDataURL('image/png');
       
-      // Menggunakan orientasi L (Landscape), ukuran kertas A4
       const pdf = new jsPDF('l', 'mm', 'a4'); 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
@@ -331,7 +344,6 @@ export default function PayrollPage() {
       pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
       pdf.save(`Payroll_Report_Week_${weekStart}.pdf`);
 
-      // Mengembalikan style seperti semula
       input.style.overflowX = originalOverflowX || 'auto';
       input.style.width = '100%';
     });
