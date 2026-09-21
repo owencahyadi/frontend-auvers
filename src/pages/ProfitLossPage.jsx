@@ -200,7 +200,7 @@ export default function ProfitLossPage() {
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '15px' }}>
-        <h1 style={{ margin: '0', color: '#0f172a' }}>
+        <h1 style={{ marginBottom: '30px', color: '#0f172a' }}>
           📊 Monthly Profit & Loss Report
         </h1>
         
