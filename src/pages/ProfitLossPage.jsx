@@ -13,7 +13,6 @@ export default function ProfitLossPage() {
   // REFERENSI UNTUK MENCETAK TABEL KE PDF
   const tableRef = useRef(null);
 
-  // --- GET USER ROLE FOR PERMISSION CHECK ---
   const userStr = localStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : {};
   const isAdmin = user.role === 'admin';
@@ -58,7 +57,6 @@ export default function ProfitLossPage() {
   };
 
   const handleSalesChange = (weekIndex, category, value) => {
-    // Prevent managers from modifying state even locally
     if (!isAdmin) return;
     if (!reportData || !reportData.weeks) return;
 
@@ -164,30 +162,38 @@ export default function ProfitLossPage() {
     XLSX.writeFile(workbook, `P&L_Report_${selectedMonth}.xlsx`);
   };
 
-  // --- FUNGSI DOWNLOAD PDF ---
+  // --- LOGIKA PDF BARU (ANTI TERPOTONG) ---
   const handleDownloadPDF = () => {
-    const input = tableRef.current;
-    if (!input) return;
+    const inputContainer = tableRef.current;
+    if (!inputContainer) return;
 
-    // Modifikasi style sementara agar tabel tidak terpotong (overflow)
-    const originalOverflowX = input.style.overflowX;
-    input.style.overflowX = 'visible'; 
-    input.style.width = 'max-content';
+    // Targetkan langsung elemen table di dalam container
+    const tableElement = inputContainer.querySelector('table');
+    if (!tableElement) return;
 
-    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
+    // Tangkap canvas berdasarkan scrollWidth (ukuran asli tabel, bukan ukuran layar)
+    html2canvas(tableElement, { 
+      scale: 2, 
+      useCORS: true,
+      windowWidth: tableElement.scrollWidth,
+      windowHeight: tableElement.scrollHeight 
+    }).then((canvas) => {
       const imgData = canvas.toDataURL('image/png');
       
-      // Menggunakan orientasi L (Landscape), ukuran kertas A4
-      const pdf = new jsPDF('l', 'mm', 'a4'); 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const margin = 20; // Margin putih 20px di sekeliling tabel
+      const pdfWidth = canvas.width + (margin * 2);
+      const pdfHeight = canvas.height + (margin * 2);
       
-      pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
+      // Buat PDF dengan Custom Page Size (Persis Seukuran Tabel + Margin)
+      const pdf = new jsPDF({
+        orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [pdfWidth, pdfHeight]
+      });
+      
+      // Tempelkan gambar tabel ke dalam PDF
+      pdf.addImage(imgData, 'PNG', margin, margin, canvas.width, canvas.height);
       pdf.save(`P&L_Report_${selectedMonth}.pdf`);
-
-      // Mengembalikan style seperti semula
-      input.style.overflowX = originalOverflowX || 'auto';
-      input.style.width = '100%';
     });
   };
 
@@ -215,7 +221,6 @@ export default function ProfitLossPage() {
             📥 Download PDF
           </button>
 
-          {/* ADMIN ONLY: SAVE SALES DATA BUTTON */}
           {isAdmin && (
             <button 
               onClick={saveSalesToDatabase}
@@ -257,7 +262,7 @@ export default function ProfitLossPage() {
         </div>
       )}
 
-      {/* P&L TABLE (DENGAN REF UNTUK PDF) */}
+      {/* P&L TABLE DENGAN REF */}
       <div ref={tableRef} style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', overflowX: 'auto', width: '100%' }}>
         {loading ? (
           <p style={{ padding: '20px', textAlign: 'center' }}>Loading data...</p>
@@ -299,7 +304,7 @@ export default function ProfitLossPage() {
                           step="0.01"
                           value={week.sales?.[cat] ?? ''}
                           onChange={(e) => handleSalesChange(idx, cat, e.target.value)}
-                          disabled={!isAdmin} // <--- LOCKED FOR MANAGERS (READ-ONLY)
+                          disabled={!isAdmin} 
                           style={{
                             width: '80px',
                             padding: '6px',
