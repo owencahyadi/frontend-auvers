@@ -8,7 +8,21 @@ export default function ProfitLossPage() {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', text: '' });
-  const [selectedMonth, setSelectedMonth] = useState('2026-06');
+  
+  // LOGIKA BARU: Tarik bulan dari localStorage 'payroll_week_start'
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const savedDate = localStorage.getItem('payroll_week_start');
+    if (savedDate) {
+      // Potong "YYYY-MM-DD" menjadi "YYYY-MM"
+      return savedDate.substring(0, 7); 
+    }
+    
+    // Jika tidak ada data tersimpan, pakai bulan ini
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  });
 
   // REFERENSI UNTUK MENCETAK TABEL KE PDF
   const tableRef = useRef(null);
@@ -16,6 +30,12 @@ export default function ProfitLossPage() {
   const userStr = localStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : {};
   const isAdmin = user.role === 'admin';
+
+  // SINKRONISASI: Jika user mengubah bulan di P&L, simpan ke localStorage 
+  // (dibuat jadi tanggal 1 agar terbaca di halaman Payroll)
+  useEffect(() => {
+    localStorage.setItem('payroll_week_start', `${selectedMonth}-01`);
+  }, [selectedMonth]);
 
   const fetchMonthlyReport = () => {
     setLoading(true);
@@ -162,16 +182,13 @@ export default function ProfitLossPage() {
     XLSX.writeFile(workbook, `P&L_Report_${selectedMonth}.xlsx`);
   };
 
-  // --- LOGIKA PDF BARU (ANTI TERPOTONG) ---
   const handleDownloadPDF = () => {
     const inputContainer = tableRef.current;
     if (!inputContainer) return;
 
-    // Targetkan langsung elemen table di dalam container
     const tableElement = inputContainer.querySelector('table');
     if (!tableElement) return;
 
-    // Tangkap canvas berdasarkan scrollWidth (ukuran asli tabel, bukan ukuran layar)
     html2canvas(tableElement, { 
       scale: 2, 
       useCORS: true,
@@ -180,18 +197,16 @@ export default function ProfitLossPage() {
     }).then((canvas) => {
       const imgData = canvas.toDataURL('image/png');
       
-      const margin = 20; // Margin putih 20px di sekeliling tabel
+      const margin = 20; 
       const pdfWidth = canvas.width + (margin * 2);
       const pdfHeight = canvas.height + (margin * 2);
       
-      // Buat PDF dengan Custom Page Size (Persis Seukuran Tabel + Margin)
       const pdf = new jsPDF({
         orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
         unit: 'px',
         format: [pdfWidth, pdfHeight]
       });
       
-      // Tempelkan gambar tabel ke dalam PDF
       pdf.addImage(imgData, 'PNG', margin, margin, canvas.width, canvas.height);
       pdf.save(`P&L_Report_${selectedMonth}.pdf`);
     });
@@ -200,7 +215,7 @@ export default function ProfitLossPage() {
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '15px' }}>
-        <h1 style={{ marginBottom: '30px', color: '#0f172a' }}>
+        <h1 style={{ margin: '0', color: '#0f172a' }}>
           📊 Monthly Profit & Loss Report
         </h1>
         
