@@ -117,6 +117,35 @@ export default function PayrollPage() {
     setFeedback({ type: '', text: '' }); 
   };
 
+  // --- LOGIKA BARU: Auto-fill Form Update Rate saat Karyawan Dipilih ---
+  const handleRateEmployeeChange = (e) => {
+    const empId = e.target.value;
+    
+    // Jika user mengembalikan ke "-- Select Staff --"
+    if (!empId) {
+      setUpdateRateData({ employee_id: '', is_fixed_salary: false, fixed_salary_amount: '', base_rate: '', rate_sat: '', rate_sun: '', overtime_rate: '', ot_threshold: '38' });
+      return;
+    }
+
+    // Cari data karyawan tersebut dari tabel payroll yang sudah diload
+    const empPayroll = payrollData.find(p => p.id == empId);
+    
+    if (empPayroll) {
+      setUpdateRateData({
+        employee_id: empId,
+        is_fixed_salary: empPayroll.is_fixed_salary || false,
+        fixed_salary_amount: empPayroll.fixed_salary_amount || '',
+        base_rate: empPayroll.rate_weekday || '',
+        rate_sat: empPayroll.rate_sat || '',
+        rate_sun: empPayroll.rate_sun || '',
+        overtime_rate: '', // Tidak ada di data tabel, jadi dikosongkan agar diisi manual
+        ot_threshold: empPayroll.ot_threshold || '38'
+      });
+    } else {
+      setUpdateRateData({ ...updateRateData, employee_id: empId });
+    }
+  };
+
   const handleStaffSubmit = (e) => {
     e.preventDefault();
     setFeedback({ type: '', text: '' });
@@ -369,7 +398,16 @@ export default function PayrollPage() {
                   <form onSubmit={handleUpdateRateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     <div>
                       <label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Select Staff</label>
-                      <select name="employee_id" value={updateRateData.employee_id} onChange={(e) => setUpdateRateData({...updateRateData, employee_id: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}>
+                      
+                      {/* INI BAGIAN YANG BERUBAH: Memanggil handleRateEmployeeChange saat dropdown diklik */}
+                      <select 
+                        name="employee_id" 
+                        value={updateRateData.employee_id} 
+                        onChange={handleRateEmployeeChange} 
+                        required 
+                        disabled={isSaving} 
+                        style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }}
+                      >
                         <option value="">-- Select Staff --</option>
                         {employees.map(emp => (<option key={emp.id} value={emp.id}>{emp.name}</option>))}
                       </select>
@@ -398,11 +436,10 @@ export default function PayrollPage() {
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Sun ($)</label><input type="number" step="0.01" name="rate_sun" value={updateRateData.rate_sun} onChange={(e) => setUpdateRateData({...updateRateData, rate_sun: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
-                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>OT Rate ($)</label><input type="number" step="0.01" name="overtime_rate" value={updateRateData.overtime_rate} onChange={(e) => setUpdateRateData({...updateRateData, overtime_rate: e.target.value})} required disabled={isSaving} style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
+                      <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>OT Rate ($)</label><input type="number" step="0.01" name="overtime_rate" value={updateRateData.overtime_rate} onChange={(e) => setUpdateRateData({...updateRateData, overtime_rate: e.target.value})} required disabled={isSaving} placeholder="Manual Entry" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                       <div style={{flex: 1}}><label style={{fontSize: '0.8rem', fontWeight: 'bold'}}>Max Normal Hrs</label><input type="number" step="1" name="ot_threshold" value={updateRateData.ot_threshold} onChange={(e) => setUpdateRateData({...updateRateData, ot_threshold: e.target.value})} required disabled={isSaving} placeholder="e.g. 38" style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: isSaving ? '#f1f5f9' : '#fff' }} /></div>
                     </div>
 
-                    {/* LOGIKA DIPERBAIKI: Checkbox ini sekarang bisa diklik bersamaan dengan Base Allowance */}
                     <label style={{ fontSize: '0.9em', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: '#fff3e0', padding: '10px', borderRadius: '5px' }}>
                       <input type="checkbox" checked={isWeeklyOnly} onChange={(e) => setIsWeeklyOnly(e.target.checked)} disabled={isSaving} />
                       Apply changes ONLY for this current week
