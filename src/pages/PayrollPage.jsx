@@ -152,7 +152,7 @@ export default function PayrollPage() {
     setFeedback({ type: '', text: '' });
     setIsSaving(true); 
 
-    // Konversi string kosong menjadi 0
+    // --- PERBAIKAN: Masukkan ot_threshold ke payload ---
     const payload = {
       ...staffData,
       fixed_salary_amount: staffData.fixed_salary_amount === '' ? 0 : staffData.fixed_salary_amount,
@@ -160,6 +160,7 @@ export default function PayrollPage() {
       rate_sat: staffData.rate_sat === '' ? 0 : staffData.rate_sat,
       rate_sun: staffData.rate_sun === '' ? 0 : staffData.rate_sun,
       overtime_rate: staffData.overtime_rate === '' ? 0 : staffData.overtime_rate,
+      ot_threshold: staffData.ot_threshold === '' ? 38 : staffData.ot_threshold, // <--- TAMBAHAN INI
     };
 
     api.post('/employees', payload).then(() => {
@@ -180,7 +181,7 @@ export default function PayrollPage() {
     setFeedback({ type: '', text: '' });
     setIsSaving(true); 
     
-    // --- LOGIKA PERBAIKAN: Konversi string kosong menjadi 0 ---
+    // --- PERBAIKAN: Masukkan ot_threshold ke payload ---
     const payload = {
       ...updateRateData,
       fixed_salary_amount: updateRateData.fixed_salary_amount === '' ? 0 : updateRateData.fixed_salary_amount,
@@ -188,6 +189,7 @@ export default function PayrollPage() {
       rate_sat: updateRateData.rate_sat === '' ? 0 : updateRateData.rate_sat,
       rate_sun: updateRateData.rate_sun === '' ? 0 : updateRateData.rate_sun,
       overtime_rate: updateRateData.overtime_rate === '' ? 0 : updateRateData.overtime_rate,
+      ot_threshold: updateRateData.ot_threshold === '' ? 38 : updateRateData.ot_threshold, // <--- TAMBAHAN INI
     };
 
     if (isWeeklyOnly) {
