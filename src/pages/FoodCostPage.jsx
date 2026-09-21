@@ -141,6 +141,10 @@ export default function FoodCostPage() {
 
   const displayedRecipes = recipes.filter(r => r.type === activeTab);
   const basePrepsList = recipes.filter(r => r.type === 'base_prep'); 
+  
+  // LOGIKA BARU: Hilangkan resep yang sedang di-edit dari daftar dropdown untuk mencegah loop (Resep memanggil dirinya sendiri)
+  const availableBasePreps = basePrepsList.filter(prep => prep.id !== editingId);
+
   const uniqueCategories = [...new Set(supplierItems.map(item => item.category))].sort();
 
   const getIngredientDetails = (ing) => {
@@ -331,12 +335,11 @@ export default function FoodCostPage() {
                 </div>
               )}
 
-              {/* SECTION 2: INGREDIENTS BUILDER (Diperbarui dengan kotak terpisah per bahan) */}
+              {/* SECTION 2: INGREDIENTS BUILDER */}
               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ margin: '0 0 15px 0', color: '#0f172a' }}>Ingredients List</h4>
                 
                 {formData.ingredients.map((ing, idx) => {
-                  // Filter logika untuk setiap baris
                   const ingItemsCat = supplierItems.filter(item => item.category === ing.category);
                   const uniqueItemNames = [...new Set(ingItemsCat.map(item => item.item_name))].sort();
                   const availableSuppliers = ingItemsCat.filter(item => item.item_name === ing.filter_item_name);
@@ -344,7 +347,6 @@ export default function FoodCostPage() {
                   return (
                     <div key={idx} style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '12px', marginBottom: '12px', position: 'relative' }}>
                       
-                      {/* Tombol Delete Baris Bahan */}
                       {formData.ingredients.length > 1 && (
                         <button type="button" disabled={isSaving} onClick={() => handleRemoveIngredientRow(idx)} style={{ position: 'absolute', top: '8px', right: '8px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '4px', fontSize: '0.9rem', padding: '2px 8px', cursor: 'pointer', fontWeight: 'bold' }}>✖</button>
                       )}
@@ -355,7 +357,8 @@ export default function FoodCostPage() {
                           <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Type</label>
                           <select disabled={isSaving} value={ing.ingredient_type} onChange={e => handleIngredientChange(idx, 'ingredient_type', e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', background: '#f8fafc' }}>
                             <option value="raw_item">Raw Supplier</option>
-                            {formData.type === 'final_menu' && <option value="sub_recipe">Base Prep</option>}
+                            {/* LOGIKA BARU: Base Prep sekarang bisa dipilih di mana saja! */}
+                            <option value="sub_recipe">Base Prep</option>
                           </select>
                         </div>
 
@@ -390,7 +393,8 @@ export default function FoodCostPage() {
                             <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Select Base Prep</label>
                             <select disabled={isSaving} required value={ing.item_id} onChange={e => handleIngredientChange(idx, 'item_id', e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', background: '#fff' }}>
                               <option value="">-- Select Base Prep --</option>
-                              {basePrepsList.map(prep => <option key={prep.id} value={prep.id}>{prep.name} (per {prep.yield_unit})</option>)}
+                              {/* LOGIKA BARU: Menggunakan availableBasePreps agar tidak bisa memanggil diri sendiri */}
+                              {availableBasePreps.map(prep => <option key={prep.id} value={prep.id}>{prep.name} (per {prep.yield_unit})</option>)}
                             </select>
                           </div>
                         )}
